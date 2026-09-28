@@ -1,0 +1,6 @@
+# Local build outputs
+/client
+/mock_server
+
+# macOS metadata
+.DS_Store

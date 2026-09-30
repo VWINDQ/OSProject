@@ -243,6 +243,55 @@ Experiment 2 เป็นเชิงความน่าจะเป็น จ
 | `... (NO LOCK)` ต่อท้ายบรรทัดเข้า/ออก | โหมด `nosync`: ไม่มีการล็อกจริง |
 | `replied SUCCESS to Client-3` | ส่งคำตอบกลับ |
 
+### ตัวอย่างจริงจากการทดลอง
+
+**`sync` (Experiment 3 รอบที่ 1, `results/exp3-mutex/server-round1.log`):** Worker-2 ได้ล็อกที่นั่ง 10 ก่อน Worker-1 และ Worker-3 ต้อง
+`waiting for mutex` จน Worker-2 จองเสร็จและคลายล็อก แล้วแต่ละตัวที่เข้าต่อเห็น `RESERVED by Client-1` จึงตอบ `FAILED`
+
+```text
+[#0002 +0058ms][Worker-2] received RESERVE 10 from Client-1
+[#0003 +0059ms][Worker-2] entering critical section (Resource 10)
+[#0004 +0059ms][Worker-2] check Resource 10: AVAILABLE
+[#0005 +0060ms][Worker-1] received RESERVE 10 from Client-2
+[#0006 +0061ms][Worker-1] waiting for mutex of Resource 10
+[#0007 +0061ms][Worker-2] random delay 181 ms
+[#0008 +0062ms][Worker-3] received RESERVE 10 from Client-3
+[#0009 +0064ms][Worker-3] waiting for mutex of Resource 10
+[#0010 +0243ms][Worker-2] Resource 10 reserved by Client-1
+[#0011 +0245ms][Worker-2] leaving critical section (Resource 10)
+[#0012 +0245ms][Worker-1] entering critical section (Resource 10)
+[#0013 +0246ms][Worker-1] check Resource 10: RESERVED by Client-1
+[#0014 +0247ms][Worker-1] Resource 10 already reserved
+[#0015 +0248ms][Worker-1] leaving critical section (Resource 10)
+```
+
+**`nosync` (Experiment 2 รอบที่ 1, `results/exp2-race/server-round1.log`):** Worker ทั้งสามตัวเข้า Critical Section พร้อมกัน (ไม่มีล็อก)
+และเห็น `AVAILABLE` ทั้งหมดก่อนที่ใครจะเขียน Worker-2 (delay สั้นสุด) จองให้ Client-3 ก่อน แต่ Worker-3 ที่ตื่นทีหลัง
+ยังเขียนทับเป็น Client-2 (`RACE DETECTED`) ทั้งที่ Client-3 ได้รับ `SUCCESS` ไปแล้ว
+
+```text
+[#0002 +0058ms][Worker-1] received RESERVE 10 from Client-1
+[#0003 +0061ms][Worker-1] entering critical section (Resource 10) (NO LOCK)
+[#0004 +0063ms][Worker-1] check Resource 10: AVAILABLE
+[#0005 +0064ms][Worker-1] random delay 386 ms
+[#0006 +0065ms][Worker-3] received RESERVE 10 from Client-2
+[#0007 +0066ms][Worker-3] entering critical section (Resource 10) (NO LOCK)
+[#0008 +0067ms][Worker-3] check Resource 10: AVAILABLE
+[#0009 +0068ms][Worker-3] random delay 316 ms
+[#0010 +0069ms][Worker-2] received RESERVE 10 from Client-3
+[#0011 +0069ms][Worker-2] entering critical section (Resource 10) (NO LOCK)
+[#0012 +0070ms][Worker-2] check Resource 10: AVAILABLE
+[#0013 +0070ms][Worker-2] random delay 53 ms
+[#0014 +0124ms][Worker-2] Resource 10 reserved by Client-3
+[#0015 +0125ms][Worker-2] leaving critical section (Resource 10) (NO LOCK)
+[#0016 +0125ms][Worker-2] replied SUCCESS to Client-3
+...
+[#0035 +0385ms][Worker-3] RACE DETECTED: Resource 10 is now owned by Client-3, overwriting
+[#0036 +0386ms][Worker-3] Resource 10 reserved by Client-2
+[#0037 +0387ms][Worker-3] leaving critical section (Resource 10) (NO LOCK)
+[#0038 +0388ms][Worker-3] replied SUCCESS to Client-2
+```
+
 ## การทดสอบ
 
 ```bash

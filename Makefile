@@ -17,8 +17,12 @@ mock_server: mock_server.c common.h
 test_logger: tests/test_logger.c logger.c logger.h
 	$(CC) $(CFLAGS) -I. $(THREADS) tests/test_logger.c logger.c -o $@ $(LDLIBS)
 
-test-unit: test_logger
+test_reservation: tests/test_reservation.c reservation.c logger.c reservation.h logger.h common.h
+	$(CC) $(CFLAGS) -I. $(THREADS) tests/test_reservation.c reservation.c logger.c -o $@ $(LDLIBS)
+
+test-unit: test_logger test_reservation
 	timeout 60 ./test_logger
+	timeout 60 ./test_reservation
 
 test-smoke: all
 	bash scripts/smoke_test.sh

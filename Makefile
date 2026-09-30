@@ -7,7 +7,7 @@ SERVER_SOURCES = server.c reservation.c logger.c
 SERVER_HEADERS = common.h reservation.h logger.h
 
 .NOTPARALLEL:
-.PHONY: all clean test test-unit test-smoke
+.PHONY: all clean test test-unit test-smoke test-experiments
 
 all: client server
 
@@ -33,7 +33,10 @@ test-unit: test_logger test_reservation
 test-smoke: all raw_request
 	bash scripts/smoke_test.sh
 
-test: test-unit test-smoke
+test-experiments: all
+	ROUNDS=3 RESULTS_DIR=/tmp/cinema_results bash scripts/experiments.sh all
+
+test: test-unit test-smoke test-experiments
 
 clean:
 	rm -f client server server_tsan raw_request test_logger test_reservation

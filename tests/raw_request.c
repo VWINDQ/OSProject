@@ -1,17 +1,9 @@
 #define _POSIX_C_SOURCE 200809L
 
-/*
- * Test helper: sends a hand-made Request straight to the server so that input
- * the real client never produces (seat 99, client 0, bad reply-queue name,
- * truncated message) can be tested.
- *
- *   raw_request <client_id> <command> <resource_id> <response_queue> [--no-reply | --short]
- *     (default)   create <response_queue>, send a full Request, print the reply
- *     --no-reply  send without creating the response queue
- *     --short     send only 10 bytes instead of a full Request
- */
+/* Test helper: sends hand-made Requests the real client never produces. Usage is printed on error. */
 
-#include "common.h"
+#include "constants/constants.h"
+#include "models/message.h"
 
 #include <errno.h>
 #include <fcntl.h>

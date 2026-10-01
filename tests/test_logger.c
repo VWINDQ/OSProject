@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include "logger.h"
+#include "utils/logger.h"
 
 #include <pthread.h>
 #include <stdio.h>
@@ -21,7 +21,6 @@ static int failures = 0;
 
 static void test_log_before_init_is_ignored(void)
 {
-    /* Must not crash: nothing has called logger_init yet. */
     log_event("Server", "nobody is listening %d", 1);
     CHECK(1);
 }

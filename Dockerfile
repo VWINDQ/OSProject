@@ -2,7 +2,8 @@ FROM gcc:14-bookworm
 
 WORKDIR /app
 
-COPY Makefile common.h client.c server.c reservation.c reservation.h logger.c logger.h ./
+COPY Makefile ./
+COPY src ./src
 COPY scripts ./scripts
 COPY tests ./tests
 

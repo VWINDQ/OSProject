@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include "logger.h"
-#include "reservation.h"
+#include "utils/logger.h"
+#include "reservation/reservation.h"
 
 #include <pthread.h>
 #include <stdio.h>
@@ -56,8 +56,7 @@ static int count_in_log(FILE *log, const char *needle)
     return count;
 }
 
-/* Most workers inside the critical section of `seat` at the same time, read
- * from the order of the log lines. */
+/* Highest number of workers inside the critical section of `seat` at once, from the log order. */
 static int max_overlap(FILE *log, int seat)
 {
     char line[256];
@@ -91,7 +90,6 @@ static void *reserve_job(void *argument)
     return NULL;
 }
 
-/* Run all jobs at the same instant; returns how many were told SUCCESS. */
 static int run_reservers(Job jobs[], int count)
 {
     pthread_t threads[16];
@@ -243,7 +241,6 @@ static void test_nosync_shows_the_race(void)
         }
     }
 
-    /* Lost update: several clients were told SUCCESS, one of them owns the seat. */
     CHECK(successes >= 2);
     CHECK(owner_is_a_client);
     CHECK(max_overlap(log, 10) >= 2);
@@ -314,7 +311,6 @@ static void *reserve_cancel_loop(void *argument)
     return NULL;
 }
 
-/* 1-based number of the first log line containing `needle`, 0 if none. */
 static int line_number(FILE *log, const char *needle)
 {
     char line[256];
@@ -350,8 +346,6 @@ static void *list_after_a_pause(void *argument)
     return NULL;
 }
 
-/* LIST takes the seat mutexes one by one. When one of them is busy the log
- * must say so, otherwise it shows other workers waiting with no visible cause. */
 static void test_list_logs_when_it_waits_for_a_seat(void)
 {
     pthread_t holder;
@@ -394,8 +388,7 @@ static void test_list_and_writers_do_not_deadlock(void)
         pthread_join(threads[index], NULL);
     }
 
-    /* A hang here is caught by `timeout` in the Makefile. Every reserve is
-     * followed by a cancel from the same client, so all seats end free. */
+    /* A hang here is caught by `timeout` in the Makefile. */
     for (index = 1; index <= MAX_SEATS; ++index) {
         CHECK(reservation_owner(index) == 0);
     }

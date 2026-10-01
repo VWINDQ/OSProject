@@ -1,0 +1,21 @@
+name: CI
+
+# Manual only for now: open the Actions tab, pick "CI" and press "Run workflow".
+# The tests start a real server and use timing (random delays), so they are not
+# run automatically on every push until they have been seen to pass on GitHub's runners.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t cinema-reservation:ci .
+      - name: Unit, smoke and experiment tests
+        run: docker run --rm cinema-reservation:ci make test

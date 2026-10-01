@@ -6,13 +6,13 @@ Server เป็น process เดียวที่มี **Worker หลาย
 
 | # | ข้อกำหนดของโจทย์ (หัวข้อ 6) | ทำไว้ที่ |
 |---|---|---|
-| 1 | เขียนด้วย C หรือ C++ | `server.c`, `client.c`, `reservation.c`, `logger.c` (C11) |
+| 1 | เขียนด้วย C หรือ C++ | `src/server/server.c`, `src/client/client.c`, `src/reservation/reservation.c`, `src/utils/logger.c` (C11) |
 | 2 | System V หรือ POSIX Message Queue | POSIX: `/cinema_request` และ `/cinema_client_<client_id>_<pid>` |
 | 3 | เลือกสถานการณ์หนึ่งแบบ | โรงภาพยนตร์ (จองที่นั่ง) |
 | 4 | ทรัพยากรอย่างน้อย 20 รายการ | ที่นั่ง 1-20 |
 | 5 | Client อย่างน้อย 5 ตัว | เปิดกี่ตัวก็ได้ (`./client <id>`), ทดลองด้วย 5 ตัว |
 | 6 | Worker อย่างน้อย 3 ตัว | ค่าเริ่มต้น 3 ตัว (`./server sync 3`) ตั้งได้ 1-32 |
-| 7 | Shared Reservation Data | `owners[1..20]` ใน `reservation.c` |
+| 7 | Shared Reservation Data | `owners[1..20]` ใน `src/reservation/reservation.c` |
 | 8 | คำสั่ง LIST, STATUS, RESERVE, CANCEL | ดู "คำสั่งที่ Client รองรับ" |
 | 9 | สร้าง Race Condition โดยตั้งใจได้ | `./server nosync 3` |
 | 10 | random delay ระหว่าง check และ update | 50-500 ms ใน `RESERVE` (เปิดทุกโหมด) |
@@ -25,21 +25,34 @@ Server เป็น process เดียวที่มี **Worker หลาย
 
 ```text
 cinema-reservation/
-├── server.c            # main, Receiver, Work Queue, Worker, ตรวจ request, shutdown
-├── reservation.c/.h    # ตารางที่นั่ง, seat_mutex, check/delay/update, โหมด sync/nosync
-├── logger.c/.h         # log ที่มี sequence number และเวลา (thread-safe)
-├── client.c            # Client (ส่งคำสั่ง, รับผลจาก Server)
-├── common.h            # protocol ที่ Client/Server ใช้ร่วมกัน
+├── .github/workflows/ci.yml   # CI (รันด้วยมือจากแท็บ Actions)
+├── src/
+│   ├── client/client.c        # Client (ส่งคำสั่ง รับผลจาก Server)
+│   ├── server/server.c        # main, Receiver, Work Queue, Worker, shutdown
+│   ├── reservation/           # ตารางที่นั่ง, seat_mutex, check/delay/update, โหมด sync/nosync
+│   │   ├── reservation.c
+│   │   └── reservation.h
+│   ├── utils/                 # log ที่มี sequence number และเวลา (thread-safe)
+│   │   ├── logger.c
+│   │   └── logger.h
+│   ├── constants/constants.h  # ชื่อคิว, ขนาด, permission (ใช้ร่วม Client/Server)
+│   └── models/message.h       # struct Request / Response
+├── docs/
+│   ├── architecture.md        # สถาปัตยกรรม Server, Critical Section, Mutex, ส่วน Client
+│   ├── docker-runtime-flow.md # ขั้นตอนใช้ Docker และแก้ปัญหา
+│   └── experiment-report.md   # ผลการทดลอง 3 กรณี และวิธีอ่าน Server log
 ├── scripts/
-│   ├── experiments.sh  # Demo 1 และ Experiment 1-3 (เก็บผลไว้ใน results/)
-│   ├── smoke_test.sh   # ทดสอบ Server กับ Client แบบ end-to-end
-│   ├── check_readme.sh # ตรวจว่า README ครบตามโจทย์ข้อ 7
-│   └── dk.sh           # รันคำสั่งใน container gcc (สำหรับ Git Bash บน Windows)
-├── tests/              # unit test (logger, reservation) และ raw_request.c
+│   ├── experiments.sh         # Demo 1 และ Experiment 1-3
+│   ├── smoke_test.sh          # ทดสอบ Server กับ Client แบบ end-to-end
+│   ├── check_readme.sh        # ตรวจว่า README/docs ครบตามโจทย์ข้อ 7
+│   └── dk.sh                  # รันคำสั่งใน container gcc (สำหรับ Git Bash บน Windows)
+├── tests/                     # unit test (logger, reservation) และ raw_request.c
 ├── Dockerfile
 ├── Makefile
 └── README.md
 ```
+
+เอกสารเพิ่มเติม: [สถาปัตยกรรม](docs/architecture.md) · [การใช้ Docker](docs/docker-runtime-flow.md) · [ผลการทดลอง](docs/experiment-report.md)
 
 ## Build Docker Image
 
@@ -144,46 +157,7 @@ Server ตรวจทุกคำขอก่อนประมวลผล: �
 
 ## สถาปัตยกรรม Server
 
-```text
-Client 1..5 ──mq_send──► /cinema_request  (POSIX message queue)
-                               │
-                  Receiver (main thread): mq_timedreceive → ตรวจ → push
-                               │
-                  Work Queue ในหน่วยความจำ (queue_mutex + condvar, ความจุ 64)
-                               │
-                  Worker-1 … Worker-N (pthread): pop → execute
-                     │                              │
-                     ▼                              ▼
-        Shared Reservation Table          mq_send (non-blocking) ตอบไปที่
-        owners[1..20] + seat_mutex[1..20] Request.response_queue
-```
-
-**Shared Data** คือ `int owners[1..20]` (0 = AVAILABLE ไม่เช่นนั้นคือ Client ID ของเจ้าของ)
-
-**Critical Section** ของแต่ละคำสั่ง:
-
-| คำสั่ง | Critical Section |
-|---|---|
-| `RESERVE` | check (`owners[id] == 0`) → random delay → update (`owners[id] = client_id`) ทั้งก้อน |
-| `CANCEL` | check เจ้าของ → update |
-| `STATUS` | อ่านที่นั่งเดียว |
-| `LIST` | อ่านทั้ง 20 ที่ (lock 1→20 ตามลำดับ คลาย 20→1 ไม่ให้เกิด deadlock) |
-
-**Mutex สามกลุ่ม** (แยกกันชัดเจน):
-
-| Mutex | ปกป้องอะไร | เปิด/ปิดได้ไหม |
-|---|---|---|
-| `seat_mutex[1..20]` | ตารางที่นั่ง `owners[]` (ตัวที่ใช้ทดลอง) | ตามโหมด `sync`/`nosync` |
-| `queue_mutex` (+ condvar) | Work Queue ภายในระหว่าง Receiver กับ Worker | เปิดตลอด (ท่อภายใน ไม่เกี่ยวกับการทดลอง) |
-| `log_mutex` | ไม่ให้บรรทัด log ปนกัน และให้ sequence number ตรงกับลำดับบรรทัด | เปิดตลอด |
-
-**ทำไม Message Queue เพียงอย่างเดียวจึงไม่พอป้องกัน Race Condition:** Message Queue ส่งมอบแต่ละคำขอให้ Worker เพียงหนึ่งตัวแบบอะตอมมิก
-แต่พอมี Worker หลายตัวหยิบคำขอคนละอัน (เช่น `RESERVE 10` จาก Client 1, 2, 3) ไปประมวลผลพร้อมกัน ทั้งหมดก็ไปอ่านและเขียน `owners[10]` ตัวเดียวกัน
-คิวไม่ได้ควบคุมลำดับการอ่าน-เขียนข้อมูลที่ Worker แชร์กัน จึงต้องมี Mutex ครอบ Critical Section
-
-**เลือก mutex ต่อที่นั่ง:** ผู้จองที่นั่งต่างกันไม่ต้องรอกัน (Demo 1 ทำงานขนานจริง) ส่วนผู้แย่งที่นั่งเดียวกันจะชนกันที่ mutex ของที่นั่งนั้นเท่านั้น
-
-**ข้อยกเว้น `LIST`:** ต้องล็อกครบทั้ง 20 ที่นั่ง (เรียง 1→20) เพื่อให้ได้ snapshot ที่สอดคล้องกัน ถ้ามี `RESERVE` ที่นั่งใดกำลังหน่วงอยู่ `LIST` จะรอที่ที่นั่งนั้น (นานสุดเท่า `delay_max`) และระหว่างรอ `LIST` ถือล็อกที่นั่งเลขน้อยกว่าไว้แล้ว คำสั่งที่ใช้ที่นั่งเหล่านั้นจึงต้องรอด้วย ทั้งหมดนี้เห็นได้ใน log: `locking all seats in order 1..20` ตามด้วย `waiting for mutex of Resource n` ของ `LIST` เอง
+Server เป็น process เดียว: Receiver (main thread) อ่านคำขอจาก `/cinema_request` แล้วส่งเข้า Work Queue ให้ Worker thread 1..N ประมวลผล ตารางที่นั่ง `owners[1..20]` คือ Shared Data ที่ป้องกันด้วย `seat_mutex[1..20]` (เปิด/ปิดด้วยโหมด `sync`/`nosync`) รายละเอียด Critical Section, Mutex ทั้งสามกลุ่ม และเหตุผลที่ Message Queue เพียงอย่างเดียวไม่พอป้องกัน Race Condition อยู่ที่ [docs/architecture.md](docs/architecture.md)
 
 ## วิธีเปิด/ปิด Synchronization
 
@@ -230,70 +204,7 @@ Experiment 2 เป็นเชิงความน่าจะเป็น จ
 
 ## อ่าน Server Log
 
-รูปแบบ `[#<ลำดับ> +<ms>ms][<ผู้ทำ>] <ข้อความ>` โดยผู้ทำคือ `Server`, `Receiver` หรือ `Worker-<n>` ลำดับเพิ่มทีละ 1 ตรงกับลำดับบรรทัดจริง
-
-| ข้อความ | ความหมาย |
-|---|---|
-| `received RESERVE 10 from Client-3` | Worker รับคำขอ |
-| `waiting for mutex of Resource 10` | (`sync`) ที่นั่งนี้ถูก Worker อื่นล็อกอยู่ ต้องรอ |
-| `locking all seats in order 1..20` | (`sync`) `LIST` เริ่มล็อกที่นั่งทีละตัวตามลำดับ (ถ้าตัวใดถูกถืออยู่จะมี `waiting for mutex of Resource n` ของ `LIST` ตามมา) |
-| `entering critical section (Resource 10)` | เข้า Critical Section (ได้ล็อกแล้ว) |
-| `check Resource 10: AVAILABLE` / `RESERVED by Client-1` | ผลการตรวจ (check) |
-| `random delay 312 ms` | หน่วงเพื่อขยาย race window |
-| `Resource 10 reserved by Client-3` | เขียนผล (update) |
-| `RACE DETECTED: Resource 10 is now owned by Client-1, overwriting` | เกิด lost update: มีคนจองตัดหน้าระหว่าง delay แต่ Worker นี้เขียนทับ (พบเฉพาะ `nosync`) |
-| `leaving critical section (Resource 10)` | ออกจาก Critical Section (log ก่อนคลายล็อกเสมอ) |
-| `... (NO LOCK)` ต่อท้ายบรรทัดเข้า/ออก | โหมด `nosync`: ไม่มีการล็อกจริง |
-| `replied SUCCESS to Client-3` | ส่งคำตอบกลับ |
-
-### ตัวอย่างจริงจากการทดลอง
-
-**`sync` (Experiment 3 รอบที่ 1 จากการรันจริง):** Worker-2 ได้ล็อกที่นั่ง 10 ก่อน Worker-1 และ Worker-3 ต้อง
-`waiting for mutex` จน Worker-2 จองเสร็จและคลายล็อก แล้วแต่ละตัวที่เข้าต่อเห็น `RESERVED by Client-1` จึงตอบ `FAILED`
-
-```text
-[#0002 +0058ms][Worker-2] received RESERVE 10 from Client-1
-[#0003 +0059ms][Worker-2] entering critical section (Resource 10)
-[#0004 +0059ms][Worker-2] check Resource 10: AVAILABLE
-[#0005 +0060ms][Worker-1] received RESERVE 10 from Client-2
-[#0006 +0061ms][Worker-1] waiting for mutex of Resource 10
-[#0007 +0061ms][Worker-2] random delay 181 ms
-[#0008 +0062ms][Worker-3] received RESERVE 10 from Client-3
-[#0009 +0064ms][Worker-3] waiting for mutex of Resource 10
-[#0010 +0243ms][Worker-2] Resource 10 reserved by Client-1
-[#0011 +0245ms][Worker-2] leaving critical section (Resource 10)
-[#0012 +0245ms][Worker-1] entering critical section (Resource 10)
-[#0013 +0246ms][Worker-1] check Resource 10: RESERVED by Client-1
-[#0014 +0247ms][Worker-1] Resource 10 already reserved
-[#0015 +0248ms][Worker-1] leaving critical section (Resource 10)
-```
-
-**`nosync` (Experiment 2 รอบที่ 1 จากการรันจริง):** Worker ทั้งสามตัวเข้า Critical Section พร้อมกัน (ไม่มีล็อก)
-และเห็น `AVAILABLE` ทั้งหมดก่อนที่ใครจะเขียน Worker-2 (delay สั้นสุด) จองให้ Client-3 ก่อน แต่ Worker-3 ที่ตื่นทีหลัง
-ยังเขียนทับเป็น Client-2 (`RACE DETECTED`) ทั้งที่ Client-3 ได้รับ `SUCCESS` ไปแล้ว
-
-```text
-[#0002 +0058ms][Worker-1] received RESERVE 10 from Client-1
-[#0003 +0061ms][Worker-1] entering critical section (Resource 10) (NO LOCK)
-[#0004 +0063ms][Worker-1] check Resource 10: AVAILABLE
-[#0005 +0064ms][Worker-1] random delay 386 ms
-[#0006 +0065ms][Worker-3] received RESERVE 10 from Client-2
-[#0007 +0066ms][Worker-3] entering critical section (Resource 10) (NO LOCK)
-[#0008 +0067ms][Worker-3] check Resource 10: AVAILABLE
-[#0009 +0068ms][Worker-3] random delay 316 ms
-[#0010 +0069ms][Worker-2] received RESERVE 10 from Client-3
-[#0011 +0069ms][Worker-2] entering critical section (Resource 10) (NO LOCK)
-[#0012 +0070ms][Worker-2] check Resource 10: AVAILABLE
-[#0013 +0070ms][Worker-2] random delay 53 ms
-[#0014 +0124ms][Worker-2] Resource 10 reserved by Client-3
-[#0015 +0125ms][Worker-2] leaving critical section (Resource 10) (NO LOCK)
-[#0016 +0125ms][Worker-2] replied SUCCESS to Client-3
-...
-[#0035 +0385ms][Worker-3] RACE DETECTED: Resource 10 is now owned by Client-3, overwriting
-[#0036 +0386ms][Worker-3] Resource 10 reserved by Client-2
-[#0037 +0387ms][Worker-3] leaving critical section (Resource 10) (NO LOCK)
-[#0038 +0388ms][Worker-3] replied SUCCESS to Client-2
-```
+Log มีรูปแบบ `[#<ลำดับ> +<ms>ms][<ผู้ทำ>] <ข้อความ>` เช่น `waiting for mutex of Resource 10` และ `RACE DETECTED` ความหมายของแต่ละข้อความและตัวอย่าง log จริงของ `sync` กับ `nosync` อยู่ที่ [docs/experiment-report.md](docs/experiment-report.md)
 
 ## การทดสอบ
 
@@ -308,67 +219,7 @@ smoke test แบบ end-to-end (รวม request ที่ผิดรูป�
 
 ## ส่วน Client
 
-### Client Workflow
-
-```text
-Start
-  |
-  v
-Validate ./client <client_id>
-  | invalid --------------------------> Show usage -> Exit
-  v
-Install SIGINT/SIGTERM handlers
-  |
-  v
-Open /cinema_request (O_WRONLY)
-  | server not ready -----------------> Explain error -> Exit
-  v
-Create /cinema_client_<id>_<pid>
-  | error ----------------------------> Close/unlink -> Exit
-  v
-Show menu
-  |
-  v
-Read -> Parse -> Validate input
-  | invalid --------------------------> Show error --+
-  |                                                |
-  v                                                |
-Build Request                                      |
-  |                                                |
-  v                                                |
-mq_send(request queue)                             |
-  |                                                |
-  v                                                |
-mq_receive(own response queue)                     |
-  |                                                |
-  v                                                |
-Display SUCCESS/FAILED                             |
-  |                                                |
-  +-- command != QUIT -----------------------------+
-  |
-  v
-mq_close() both queues -> mq_unlink() own response queue -> Exit
-```
-
-Client ไม่เก็บตารางที่นั่งและไม่ตัดสินเองว่าที่นั่งว่างหรือไม่ ส่งทีละคำขอแล้วรอคำตอบก่อนรับคำสั่งถัดไป
-Response Queue สร้างด้วย `O_RDONLY | O_CREAT | O_EXCL` permission `0600`; Request Queue เปิดด้วย `O_WRONLY` โดยไม่ใช้ `O_CREAT` เพื่อให้ตรวจพบทันทีว่า Server ยังไม่เริ่ม
-
-### หน้าที่ของแต่ละ Function ใน `client.c`
-
-| Function | รับอะไร | ทำอะไร/คืนอะไร | เรียกตอนไหน |
-|---|---|---|---|
-| `show_menu` | Client ID | แสดงชื่อระบบและคำสั่ง | หลังเปิดคิวสำเร็จ |
-| `read_input` | buffer และขนาด | อ่านหนึ่งบรรทัด; แยกผลปกติ, EOF, ยาวเกิน, error | ทุกรอบของ menu loop |
-| `parse_command` | ข้อความ input | แยก command/seat, แปลง command เป็นตัวใหญ่, ตรวจรูปแบบ | หลังอ่าน input |
-| `validate_command` | command ที่ parse แล้ว | ตรวจ seat ให้อยู่ใน 1-20 | ก่อนสร้าง Request |
-| `parse_client_id` | argument จาก command line | แปลงและตรวจ Client ID | ตอนเริ่มโปรแกรม |
-| `open_request_queue` | ไม่มี | เปิด `/cinema_request`; คืน queue descriptor หรือ error | ก่อนเข้า menu |
-| `create_response_queue` | Client ID และ buffer ชื่อ | สร้างคิวเฉพาะ Client; คืน descriptor หรือ error | ก่อนเข้า menu |
-| `build_request` | Client ID, command, queue name | ล้าง struct แล้วใส่ทุก field | ก่อนส่งแต่ละคำขอ |
-| `send_request` | request queue และ `Request` | เรียก `mq_send`; คืน true/false | หลัง input ผ่าน validation |
-| `receive_response` | response queue และ `Response` | เรียก `mq_receive`, ตรวจขนาดข้อความ; คืน true/false | หลังส่งสำเร็จ |
-| `cleanup` | `ClientContext` | ปิด descriptor ทั้งสองและ unlink คิวตอบกลับ | ทุกทางออกหลังเปิดคิว |
-| `main` | `argc/argv` | ควบคุม workflow โดยไม่ทำรายละเอียดเอง | จุดเริ่มโปรแกรม |
+Client (`src/client/client.c`) อ่านคำสั่งจากผู้ใช้ ตรวจรูปแบบ ส่ง `Request` เข้า `/cinema_request` แล้วรอคำตอบจากคิวของตนเอง flow และหน้าที่ของแต่ละ function อยู่ที่ [docs/architecture.md](docs/architecture.md)
 
 ## ข้อจำกัด
 

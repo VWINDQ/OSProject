@@ -13,6 +13,7 @@ stop_server() {
     local status=0
 
     if [[ -n "${server_pid}" ]]; then
+        kill -CONT "${server_pid}" 2>/dev/null || true # a stopped process ignores TERM
         kill -TERM "${server_pid}" 2>/dev/null || true
         wait "${server_pid}" 2>/dev/null || status=$?
         server_pid=""
@@ -51,6 +52,15 @@ wait_for() {
 }
 
 log_has() { grep -Fq -- "$1" "${current_log}"; }
+
+# True once /cinema_request holds QUEUE_MAX_MESSAGES (10) requests of
+# sizeof(Request) (92) bytes each; /dev/mqueue reports the byte count as QSIZE.
+request_queue_full() {
+    local queued
+
+    queued="$(sed -n 's/^QSIZE:\([0-9]*\).*/\1/p' "${QUEUE_FILE}")"
+    [[ "${queued:-0}" -ge $((10 * 92)) ]]
+}
 
 # start_server <log-name> <server arguments...>
 # Set KEEP_QUEUE=1 to leave a stale queue in place.
@@ -116,11 +126,17 @@ expect "$(run_client 6 'STATUS 4')" "SUCCESS: Seat 4 is available." "seat 4 unto
 
 echo "== A. burst of 30 clients against a queue of depth 10"
 mkdir "${work_dir}/burst"
+# Freeze the server so the clients really do fill /cinema_request (10 queued,
+# the other 20 blocked in mq_send); then let it drain and expect every reply.
+kill -STOP "${server_pid}"
 pids=()
 for id in $(seq 101 130); do
     (printf 'STATUS 1\nQUIT\n' | ./client "${id}" > "${work_dir}/burst/${id}.txt" 2>&1) &
     pids+=("$!")
 done
+wait_for "request queue to fill up" request_queue_full
+echo "  ok: request queue was full (clients blocked in mq_send)"
+kill -CONT "${server_pid}"
 wait "${pids[@]}"
 ok_count="$(grep -l 'SUCCESS: Seat 1 is available.' "${work_dir}"/burst/*.txt | wc -l)"
 [[ "${ok_count}" -eq 30 ]] || fail "only ${ok_count} of 30 burst clients got a reply"

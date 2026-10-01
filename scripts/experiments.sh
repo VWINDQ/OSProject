@@ -61,7 +61,10 @@ check() {
 }
 
 # One round: 5 clients send RESERVE 10 at the same time.
-# Sets: round_successes, round_races, round_final_owner
+# Sets: round_successes, round_races, round_final_owner, round_errors (clients
+# that neither won nor were refused with "already reserved"), round_owner_ok
+# (the final owner is one of the clients that were told SUCCESS) and
+# round_waits (how often a worker really had to wait for the seat's mutex).
 reserve_round() {
     local dir="$1" mode="$2" workers="$3" round="$4"
     local log="${dir}/server-round${round}.log"
@@ -79,25 +82,38 @@ reserve_round() {
     stop_server
 
     round_successes=0
+    round_errors=0
+    winners=" "
     : > "${table}"
     for id in $(seq 1 "${CLIENT_COUNT}"); do
         if grep -Fq "SUCCESS: Seat ${SEAT} reserved successfully." "${tmp}/client-${id}.txt"; then
             verdict=SUCCESS
             round_successes=$((round_successes + 1))
-        else
+            winners="${winners}${id} "
+        elif grep -Fq "FAILED: Seat ${SEAT} is already reserved." "${tmp}/client-${id}.txt"; then
             verdict=FAILED
+        else
+            verdict="ERROR (unexpected reply)"
+            round_errors=$((round_errors + 1))
         fi
         echo "Client ${id} : ${verdict}" >> "${table}"
     done
     round_races="$(grep -c 'RACE DETECTED' "${log}" || true)"
+    round_waits="$(grep -c "waiting for mutex of Resource ${SEAT}" "${log}" || true)"
     round_final_owner="$(sed -n 's/.*reserved by Client \([0-9]*\)\..*/\1/p' "${tmp}/final.txt")"
     round_final_owner="${round_final_owner:-none}"
+    round_owner_ok=0
+    if [[ "${winners}" == *" ${round_final_owner} "* ]]; then
+        round_owner_ok=1
+    fi
     rm -rf "${tmp}"
 }
 
-# run_reserve_experiment <dir> <title> <mode> <workers> <one|race>
+# run_reserve_experiment <dir> <title> <mode> <workers> <one|race> <min_waits>
+# min_waits: every round must show at least this many "waiting for mutex" lines
+# (1 for the mutex experiment, to prove the workers really contended).
 run_reserve_experiment() {
-    local name="$1" title="$2" mode="$3" workers="$4" expectation="$5"
+    local name="$1" title="$2" mode="$3" workers="$4" expectation="$5" min_waits="$6"
     local dir="${RESULTS_DIR}/${name}"
     local round bad_rounds=0 race_rounds=0 total_successes=0
 
@@ -112,15 +128,21 @@ run_reserve_experiment() {
 
     for round in $(seq 1 "${ROUNDS}"); do
         reserve_round "${dir}" "${mode}" "${workers}" "${round}"
-        echo "round ${round}: SUCCESS=${round_successes} RACE_DETECTED=${round_races} final_owner=${round_final_owner}" | tee -a "${summary}"
+        echo "round ${round}: SUCCESS=${round_successes} RACE_DETECTED=${round_races} final_owner=${round_final_owner} other_failures=${round_errors} mutex_waits=${round_waits}" | tee -a "${summary}"
         if [[ "${round}" -eq 1 ]]; then
             sed 's/^/    /' "${dir}/clients-round1.txt" | tee -a "${summary}"
         fi
         total_successes=$((total_successes + round_successes))
+        # A round only counts when every client got a real answer and the final
+        # owner is one of the clients that were told SUCCESS.
+        if [[ "${round_errors}" -ne 0 || "${round_owner_ok}" -ne 1 ]]; then
+            bad_rounds=$((bad_rounds + 1))
+            continue
+        fi
         if [[ "${round_successes}" -ge 2 && "${round_races}" -ge 1 ]]; then
             race_rounds=$((race_rounds + 1))
         fi
-        if [[ "${round_successes}" -ne 1 || "${round_races}" -ne 0 ]]; then
+        if [[ "${round_successes}" -ne 1 || "${round_races}" -ne 0 || "${round_waits}" -lt "${min_waits}" ]]; then
             bad_rounds=$((bad_rounds + 1))
         fi
     done
@@ -128,14 +150,14 @@ run_reserve_experiment() {
     {
         echo
         echo "rounds with more than one SUCCESS and a RACE DETECTED line: ${race_rounds} of ${ROUNDS}"
-        echo "rounds with exactly one SUCCESS and no race: $((ROUNDS - bad_rounds)) of ${ROUNDS}"
+        echo "rounds that were sound (every client answered, owner matches a SUCCESS) with exactly one SUCCESS, no race and the required mutex waits: $((ROUNDS - bad_rounds)) of ${ROUNDS}"
     } | tee -a "${summary}"
 
     if [[ "${expectation}" == "one" ]]; then
         if [[ "${bad_rounds}" -eq 0 ]]; then
             echo "RESULT: PASS (exactly one client reserved seat ${SEAT} in every round)" | tee -a "${summary}"
         else
-            echo "RESULT: FAIL (${bad_rounds} round(s) did not end with exactly one SUCCESS)" | tee -a "${summary}"
+            echo "RESULT: FAIL (${bad_rounds} round(s) were not sound with exactly one SUCCESS; see the round lines above)" | tee -a "${summary}"
             failed=1
         fi
     else
@@ -206,17 +228,17 @@ run_mixed_demo() {
 
 run_experiment_1() {
     run_reserve_experiment exp1-sequential \
-        "Experiment 1: Sequential baseline (one worker)" sync 1 one
+        "Experiment 1: Sequential baseline (one worker)" sync 1 one 0
 }
 
 run_experiment_2() {
     run_reserve_experiment exp2-race \
-        "Experiment 2: Concurrent without synchronization (race condition)" nosync 3 race
+        "Experiment 2: Concurrent without synchronization (race condition)" nosync 3 race 0
 }
 
 run_experiment_3() {
     run_reserve_experiment exp3-mutex \
-        "Experiment 3: Concurrent with mutex (same workers, same random delay)" sync 3 one
+        "Experiment 3: Concurrent with mutex (same workers, same random delay)" sync 3 one 1
 }
 
 case "${1:-all}" in

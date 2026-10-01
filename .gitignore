@@ -11,3 +11,7 @@
 
 # Python caches from report tooling
 __pycache__/
+
+# Local deliverables and generated experiment output (not part of the repo)
+/report/
+/results/

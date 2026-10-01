@@ -36,7 +36,6 @@ cinema-reservation/
 │   ├── check_readme.sh # ตรวจว่า README ครบตามโจทย์ข้อ 7
 │   └── dk.sh           # รันคำสั่งใน container gcc (สำหรับ Git Bash บน Windows)
 ├── tests/              # unit test (logger, reservation) และ raw_request.c
-├── results/            # หลักฐานการทดลองจริงจาก Docker
 ├── Dockerfile
 ├── Makefile
 └── README.md
@@ -249,7 +248,7 @@ Experiment 2 เป็นเชิงความน่าจะเป็น จ
 
 ### ตัวอย่างจริงจากการทดลอง
 
-**`sync` (Experiment 3 รอบที่ 1, `results/exp3-mutex/server-round1.log`):** Worker-2 ได้ล็อกที่นั่ง 10 ก่อน Worker-1 และ Worker-3 ต้อง
+**`sync` (Experiment 3 รอบที่ 1 จากการรันจริง):** Worker-2 ได้ล็อกที่นั่ง 10 ก่อน Worker-1 และ Worker-3 ต้อง
 `waiting for mutex` จน Worker-2 จองเสร็จและคลายล็อก แล้วแต่ละตัวที่เข้าต่อเห็น `RESERVED by Client-1` จึงตอบ `FAILED`
 
 ```text
@@ -269,7 +268,7 @@ Experiment 2 เป็นเชิงความน่าจะเป็น จ
 [#0015 +0248ms][Worker-1] leaving critical section (Resource 10)
 ```
 
-**`nosync` (Experiment 2 รอบที่ 1, `results/exp2-race/server-round1.log`):** Worker ทั้งสามตัวเข้า Critical Section พร้อมกัน (ไม่มีล็อก)
+**`nosync` (Experiment 2 รอบที่ 1 จากการรันจริง):** Worker ทั้งสามตัวเข้า Critical Section พร้อมกัน (ไม่มีล็อก)
 และเห็น `AVAILABLE` ทั้งหมดก่อนที่ใครจะเขียน Worker-2 (delay สั้นสุด) จองให้ Client-3 ก่อน แต่ Worker-3 ที่ตื่นทีหลัง
 ยังเขียนทับเป็น Client-2 (`RACE DETECTED`) ทั้งที่ Client-3 ได้รับ `SUCCESS` ไปแล้ว
 

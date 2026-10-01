@@ -1,0 +1,10 @@
+date: 2026-09-30T22:11:29Z
+git commit: 7a5aff9971b3a3d1c7257d52df15d5f3101c6961
+docker client/server: 29.7.2 / 29.7.2
+image: sha256:e8ceb5cc23904762799a5545b5dd36f3ab73e9b0f2c974168052e426a58902f2
+kernel: 6.18.33.2-microsoft-standard-WSL2
+cpus: 12
+compiler: gcc (GCC) 14.3.0
+mqueue limits: msg_max=10 msgsize_max=8192
+
+note: results/mixed-demo was regenerated after the final-review fix pass (LIST now logs its lock waits); exp1/exp2/exp3 and manual-rehearsal come from the run above, whose code paths (RESERVE/STATUS) are unchanged by that fix.

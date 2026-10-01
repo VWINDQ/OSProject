@@ -1,0 +1,80 @@
+[#0001 +0000ms][Server] started: mode=sync workers=3 delay=50-500 ms queue=/cinema_request
+[#0002 +0064ms][Worker-1] received RESERVE 10 from Client-2
+[#0003 +0065ms][Worker-1] entering critical section (Resource 10)
+[#0004 +0066ms][Worker-1] check Resource 10: AVAILABLE
+[#0005 +0067ms][Worker-1] random delay 418 ms
+[#0006 +0068ms][Worker-3] received RESERVE 10 from Client-3
+[#0007 +0068ms][Worker-3] waiting for mutex of Resource 10
+[#0008 +0069ms][Worker-2] received RESERVE 10 from Client-1
+[#0009 +0071ms][Worker-2] waiting for mutex of Resource 10
+[#0010 +0486ms][Worker-1] Resource 10 reserved by Client-2
+[#0011 +0487ms][Worker-1] leaving critical section (Resource 10)
+[#0012 +0488ms][Worker-3] entering critical section (Resource 10)
+[#0013 +0489ms][Worker-3] check Resource 10: RESERVED by Client-2
+[#0014 +0490ms][Worker-3] Resource 10 already reserved
+[#0015 +0491ms][Worker-3] leaving critical section (Resource 10)
+[#0016 +0492ms][Worker-1] replied SUCCESS to Client-2
+[#0017 +0493ms][Worker-1] received RESERVE 10 from Client-4
+[#0018 +0494ms][Worker-1] waiting for mutex of Resource 10
+[#0019 +0496ms][Worker-2] entering critical section (Resource 10)
+[#0020 +0497ms][Worker-2] check Resource 10: RESERVED by Client-2
+[#0021 +0498ms][Worker-2] Resource 10 already reserved
+[#0022 +0499ms][Worker-2] leaving critical section (Resource 10)
+[#0023 +0500ms][Worker-3] replied FAILED to Client-3
+[#0024 +0501ms][Worker-3] received RESERVE 10 from Client-5
+[#0025 +0501ms][Worker-3] waiting for mutex of Resource 10
+[#0026 +0503ms][Worker-1] entering critical section (Resource 10)
+[#0027 +0504ms][Worker-1] check Resource 10: RESERVED by Client-2
+[#0028 +0505ms][Worker-1] Resource 10 already reserved
+[#0029 +0506ms][Worker-1] leaving critical section (Resource 10)
+[#0030 +0507ms][Worker-2] replied FAILED to Client-1
+[#0031 +0508ms][Worker-2] received QUIT from Client-2
+[#0032 +0508ms][Worker-1] replied FAILED to Client-4
+[#0033 +0509ms][Worker-1] received QUIT from Client-3
+[#0034 +0511ms][Worker-2] replied SUCCESS to Client-2
+[#0035 +0512ms][Worker-2] received QUIT from Client-1
+[#0036 +0513ms][Worker-1] replied SUCCESS to Client-3
+[#0037 +0515ms][Worker-3] entering critical section (Resource 10)
+[#0038 +0516ms][Worker-3] check Resource 10: RESERVED by Client-2
+[#0039 +0517ms][Worker-3] Resource 10 already reserved
+[#0040 +0518ms][Worker-3] leaving critical section (Resource 10)
+[#0041 +0519ms][Worker-1] received QUIT from Client-4
+[#0042 +0520ms][Worker-2] replied SUCCESS to Client-1
+[#0043 +0522ms][Worker-2] received QUIT from Client-5
+[#0044 +0523ms][Worker-1] replied SUCCESS to Client-4
+[#0045 +0525ms][Worker-3] replied FAILED to Client-5
+[#0046 +0526ms][Worker-2] replied SUCCESS to Client-5
+[#0047 +0527ms][Worker-1] received STATUS 10 from Client-99
+[#0048 +0529ms][Worker-1] entering critical section (Resource 10)
+[#0049 +0530ms][Worker-1] check Resource 10: RESERVED by Client-2
+[#0050 +0531ms][Worker-1] leaving critical section (Resource 10)
+[#0051 +0531ms][Worker-1] replied SUCCESS to Client-99
+[#0052 +0533ms][Worker-3] received QUIT from Client-99
+[#0053 +0534ms][Worker-3] replied SUCCESS to Client-99
+[#0054 +0535ms][Server] shutting down
+[#0055 +0536ms][Server] Worker-1 processed 5 requests
+[#0056 +0538ms][Server] Worker-2 processed 4 requests
+[#0057 +0539ms][Server] Worker-3 processed 3 requests
+Resource  Status     Owner
+--------------------------------
+1         AVAILABLE  -
+2         AVAILABLE  -
+3         AVAILABLE  -
+4         AVAILABLE  -
+5         AVAILABLE  -
+6         AVAILABLE  -
+7         AVAILABLE  -
+8         AVAILABLE  -
+9         AVAILABLE  -
+10        RESERVED   Client-2
+11        AVAILABLE  -
+12        AVAILABLE  -
+13        AVAILABLE  -
+14        AVAILABLE  -
+15        AVAILABLE  -
+16        AVAILABLE  -
+17        AVAILABLE  -
+18        AVAILABLE  -
+19        AVAILABLE  -
+20        AVAILABLE  -
+[#0058 +0542ms][Server] stopped

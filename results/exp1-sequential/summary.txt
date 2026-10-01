@@ -1,0 +1,22 @@
+Experiment 1: Sequential baseline (one worker)
+server: ./server sync 1   clients: 5 x RESERVE 10   rounds: 10
+
+round 1: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+    Client 1 : SUCCESS
+    Client 2 : FAILED
+    Client 3 : FAILED
+    Client 4 : FAILED
+    Client 5 : FAILED
+round 2: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+round 3: SUCCESS=1 RACE_DETECTED=0 final_owner=2
+round 4: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+round 5: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+round 6: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+round 7: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+round 8: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+round 9: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+round 10: SUCCESS=1 RACE_DETECTED=0 final_owner=1
+
+rounds with more than one SUCCESS and a RACE DETECTED line: 0 of 10
+rounds with exactly one SUCCESS and no race: 10 of 10
+RESULT: PASS (exactly one client reserved seat 10 in every round)

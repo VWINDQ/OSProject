@@ -1,6 +1,13 @@
 # Local build outputs
 /client
-/mock_server
+/server
+/server_tsan
+/raw_request
+/test_logger
+/test_reservation
 
 # macOS metadata
 .DS_Store
+
+# Python caches from report tooling
+__pycache__/

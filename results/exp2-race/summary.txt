@@ -1,0 +1,22 @@
+Experiment 2: Concurrent without synchronization (race condition)
+server: ./server nosync 3   clients: 5 x RESERVE 10   rounds: 10
+
+round 1: SUCCESS=3 RACE_DETECTED=2 final_owner=1
+    Client 1 : SUCCESS
+    Client 2 : SUCCESS
+    Client 3 : SUCCESS
+    Client 4 : FAILED
+    Client 5 : FAILED
+round 2: SUCCESS=3 RACE_DETECTED=2 final_owner=1
+round 3: SUCCESS=3 RACE_DETECTED=2 final_owner=3
+round 4: SUCCESS=3 RACE_DETECTED=2 final_owner=1
+round 5: SUCCESS=3 RACE_DETECTED=2 final_owner=1
+round 6: SUCCESS=3 RACE_DETECTED=2 final_owner=2
+round 7: SUCCESS=3 RACE_DETECTED=2 final_owner=1
+round 8: SUCCESS=3 RACE_DETECTED=2 final_owner=2
+round 9: SUCCESS=3 RACE_DETECTED=2 final_owner=3
+round 10: SUCCESS=3 RACE_DETECTED=2 final_owner=2
+
+rounds with more than one SUCCESS and a RACE DETECTED line: 10 of 10
+rounds with exactly one SUCCESS and no race: 0 of 10
+RESULT: PASS (race condition observed in 10 of 10 rounds)

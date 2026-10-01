@@ -1,5 +1,0 @@
-Client 1 : SUCCESS
-Client 2 : SUCCESS
-Client 3 : FAILED
-Client 4 : SUCCESS
-Client 5 : FAILED

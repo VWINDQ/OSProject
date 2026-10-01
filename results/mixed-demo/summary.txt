@@ -1,7 +1,7 @@
 Demo 1: five clients send different commands at the same time
 server: ./server sync 3
 
-all five clients finished in 480 ms
+all five clients finished in 491 ms
   [PASS] Client 1 reserved seat 3
   [PASS] Client 2 reserved seat 7
   [PASS] Client 3 reserved seat 12

@@ -184,6 +184,8 @@ Client 1..5 ──mq_send──► /cinema_request  (POSIX message queue)
 
 **เลือก mutex ต่อที่นั่ง:** ผู้จองที่นั่งต่างกันไม่ต้องรอกัน (Demo 1 ทำงานขนานจริง) ส่วนผู้แย่งที่นั่งเดียวกันจะชนกันที่ mutex ของที่นั่งนั้นเท่านั้น
 
+**ข้อยกเว้น `LIST`:** ต้องล็อกครบทั้ง 20 ที่นั่ง (เรียง 1→20) เพื่อให้ได้ snapshot ที่สอดคล้องกัน ถ้ามี `RESERVE` ที่นั่งใดกำลังหน่วงอยู่ `LIST` จะรอที่ที่นั่งนั้น (นานสุดเท่า `delay_max`) และระหว่างรอ `LIST` ถือล็อกที่นั่งเลขน้อยกว่าไว้แล้ว คำสั่งที่ใช้ที่นั่งเหล่านั้นจึงต้องรอด้วย ทั้งหมดนี้เห็นได้ใน log: `locking all seats in order 1..20` ตามด้วย `waiting for mutex of Resource n` ของ `LIST` เอง
+
 ## วิธีเปิด/ปิด Synchronization
 
 เลือกตอนเปิด Server ไม่ต้อง compile ใหม่:
@@ -223,6 +225,7 @@ docker exec -e ROUNDS=10 cinema bash scripts/experiments.sh all   # 10 รอบ
 | **Experiment 3** Mutex | `sync 3` (delay เท่าเดิม) | 5 ตัว `RESERVE 10` | SUCCESS เพียง 1 ราย ไม่มี `RACE DETECTED` |
 
 สคริปต์เปิด Client 5 ตัวพร้อมกันในแต่ละรอบ พิมพ์ตาราง `Client N : SUCCESS|FAILED` และเจ้าของสุดท้ายจาก `STATUS 10` แล้วสรุปเป็น PASS/FAIL
+รอบหนึ่งจะนับว่าใช้ได้ก็ต่อเมื่อทุก Client ได้คำตอบที่ถูกต้อง (`SUCCESS` หรือ `FAILED: Seat 10 is already reserved.` เท่านั้น) และเจ้าของสุดท้ายเป็นหนึ่งใน Client ที่ได้ `SUCCESS` นอกจากนี้ Experiment 3 ต้องมีบรรทัด `waiting for mutex` อย่างน้อยหนึ่งบรรทัดในทุกรอบ เพื่อพิสูจน์ว่า Worker แย่ง mutex กันจริง
 Experiment 2 เป็นเชิงความน่าจะเป็น จึงรายงานเป็น "เกิด race กี่รอบจากทั้งหมด" ผลแต่ละการทดลองอยู่ที่ `results/<ชื่อ>/summary.txt`
 พร้อม `server-round<N>.log` และ `clients-round<N>.txt`
 
@@ -234,6 +237,7 @@ Experiment 2 เป็นเชิงความน่าจะเป็น จ
 |---|---|
 | `received RESERVE 10 from Client-3` | Worker รับคำขอ |
 | `waiting for mutex of Resource 10` | (`sync`) ที่นั่งนี้ถูก Worker อื่นล็อกอยู่ ต้องรอ |
+| `locking all seats in order 1..20` | (`sync`) `LIST` เริ่มล็อกที่นั่งทีละตัวตามลำดับ (ถ้าตัวใดถูกถืออยู่จะมี `waiting for mutex of Resource n` ของ `LIST` ตามมา) |
 | `entering critical section (Resource 10)` | เข้า Critical Section (ได้ล็อกแล้ว) |
 | `check Resource 10: AVAILABLE` / `RESERVED by Client-1` | ผลการตรวจ (check) |
 | `random delay 312 ms` | หน่วงเพื่อขยาย race window |
@@ -300,7 +304,7 @@ bash scripts/dk.sh make test                 # จาก Git Bash บน Windows
 ```
 
 `make test` รัน unit test (logger, reservation: `sync` ได้ผู้ชนะเดียว, `nosync` เกิด race, mutex ต่อที่นั่งทำงานขนาน, `LIST` ไม่ deadlock),
-smoke test แบบ end-to-end (รวม request ที่ผิดรูปแบบ, Client ที่หายไป, SIGTERM ระหว่างประมวลผล, คิวค้างหลัง `kill -9`, Client 30 ตัวพร้อมกัน, อาร์กิวเมนต์ผิด)
+smoke test แบบ end-to-end (รวม request ที่ผิดรูปแบบ, Client ที่หายไป, SIGTERM ระหว่างประมวลผล, คิวค้างหลัง `kill -9`, Client 30 ตัวขณะที่ Server ถูกหยุดจนคิวคำขอเต็มจริง, อาร์กิวเมนต์ผิด)
 และ Experiment ทั้งหมด (3 รอบ เขียนผลที่ `/tmp/cinema_results` ไม่ทับ `results/`)
 
 ## ส่วน Client

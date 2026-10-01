@@ -6,3 +6,5 @@ kernel: 6.18.33.2-microsoft-standard-WSL2
 cpus: 12
 compiler: gcc (GCC) 14.3.0
 mqueue limits: msg_max=10 msgsize_max=8192
+
+note: results/mixed-demo was regenerated after the final-review fix pass (LIST now logs its lock waits); exp1/exp2/exp3 and manual-rehearsal come from the run above, whose code paths (RESERVE/STATUS) are unchanged by that fix.

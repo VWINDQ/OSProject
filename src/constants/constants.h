@@ -1,5 +1,5 @@
-#ifndef CINEMA_COMMON_H
-#define CINEMA_COMMON_H
+#ifndef CINEMA_CONSTANTS_H
+#define CINEMA_CONSTANTS_H
 
 /* POSIX message queue names must start with '/'. */
 #define REQUEST_QUEUE "/cinema_request"
@@ -19,20 +19,5 @@
 
 #define RESPONSE_FAILED 0
 #define RESPONSE_SUCCESS 1
-
-typedef struct {
-    int client_id;
-    char command[COMMAND_SIZE];
-    int resource_id;
-    char response_queue[QUEUE_NAME_SIZE];
-} Request;
-
-typedef struct {
-    int success;
-    char message[RESPONSE_MESSAGE_SIZE];
-} Response;
-
-#define REQUEST_MESSAGE_SIZE ((long)sizeof(Request))
-#define RESPONSE_MESSAGE_SIZE_BYTES ((long)sizeof(Response))
 
 #endif

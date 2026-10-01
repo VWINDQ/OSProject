@@ -1,8 +1,9 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include "common.h"
-#include "logger.h"
-#include "reservation.h"
+#include "constants/constants.h"
+#include "models/message.h"
+#include "reservation/reservation.h"
+#include "utils/logger.h"
 
 #include <errno.h>
 #include <fcntl.h>

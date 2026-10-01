@@ -1,7 +1,7 @@
 #ifndef CINEMA_RESERVATION_H
 #define CINEMA_RESERVATION_H
 
-#include "common.h"
+#include "models/message.h"
 
 #include <stdio.h>
 

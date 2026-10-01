@@ -11,7 +11,8 @@
  *     --short     send only 10 bytes instead of a full Request
  */
 
-#include "common.h"
+#include "constants/constants.h"
+#include "models/message.h"
 
 #include <errno.h>
 #include <fcntl.h>

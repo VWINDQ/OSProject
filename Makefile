@@ -2,29 +2,31 @@ CC ?= gcc
 CFLAGS ?= -std=c11 -Wall -Wextra -Wpedantic -Werror -O2
 LDLIBS ?= -lrt
 THREADS = -pthread
+INCLUDES = -Isrc
 
-SERVER_SOURCES = server.c reservation.c logger.c
-SERVER_HEADERS = common.h reservation.h logger.h
+CLIENT_SOURCES = src/client/client.c
+SERVER_SOURCES = src/server/server.c src/reservation/reservation.c src/utils/logger.c
+HEADERS = $(wildcard src/*/*.h)
 
 .NOTPARALLEL:
 .PHONY: all clean test test-unit test-smoke test-experiments
 
 all: client server
 
-client: client.c common.h
-	$(CC) $(CFLAGS) client.c -o $@ $(LDLIBS)
+client: $(CLIENT_SOURCES) $(HEADERS)
+	$(CC) $(CFLAGS) $(INCLUDES) $(CLIENT_SOURCES) -o $@ $(LDLIBS)
 
-server: $(SERVER_SOURCES) $(SERVER_HEADERS)
-	$(CC) $(CFLAGS) $(THREADS) $(SERVER_SOURCES) -o $@ $(LDLIBS)
+server: $(SERVER_SOURCES) $(HEADERS)
+	$(CC) $(CFLAGS) $(INCLUDES) $(THREADS) $(SERVER_SOURCES) -o $@ $(LDLIBS)
 
-raw_request: tests/raw_request.c common.h
-	$(CC) $(CFLAGS) -I. tests/raw_request.c -o $@ $(LDLIBS)
+raw_request: tests/raw_request.c $(HEADERS)
+	$(CC) $(CFLAGS) $(INCLUDES) tests/raw_request.c -o $@ $(LDLIBS)
 
-test_logger: tests/test_logger.c logger.c logger.h
-	$(CC) $(CFLAGS) -I. $(THREADS) tests/test_logger.c logger.c -o $@ $(LDLIBS)
+test_logger: tests/test_logger.c src/utils/logger.c $(HEADERS)
+	$(CC) $(CFLAGS) $(INCLUDES) $(THREADS) tests/test_logger.c src/utils/logger.c -o $@ $(LDLIBS)
 
-test_reservation: tests/test_reservation.c reservation.c logger.c reservation.h logger.h common.h
-	$(CC) $(CFLAGS) -I. $(THREADS) tests/test_reservation.c reservation.c logger.c -o $@ $(LDLIBS)
+test_reservation: tests/test_reservation.c src/reservation/reservation.c src/utils/logger.c $(HEADERS)
+	$(CC) $(CFLAGS) $(INCLUDES) $(THREADS) tests/test_reservation.c src/reservation/reservation.c src/utils/logger.c -o $@ $(LDLIBS)
 
 test-unit: test_logger test_reservation
 	timeout 60 ./test_logger
@@ -39,4 +41,4 @@ test-experiments: all
 test: test-unit test-smoke test-experiments
 
 clean:
-	rm -f client server server_tsan raw_request test_logger test_reservation
+	rm -f client server raw_request test_logger test_reservation

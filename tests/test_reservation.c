@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include "logger.h"
-#include "reservation.h"
+#include "utils/logger.h"
+#include "reservation/reservation.h"
 
 #include <pthread.h>
 #include <stdio.h>

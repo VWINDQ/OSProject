@@ -131,15 +131,21 @@ static void sleep_ms(int milliseconds)
     }
 }
 
+/* Take one seat's mutex, logging when it is busy so a wait is never invisible. */
+static void lock_seat(const char *actor, int seat)
+{
+    if (pthread_mutex_trylock(&seat_mutex[seat]) != 0) {
+        log_event(actor, "waiting for mutex of Resource %d", seat);
+        mutex_lock(&seat_mutex[seat]);
+    }
+}
+
 /* Critical-section entry/exit for one seat. In SYNC_MODE_NOSYNC nothing is
  * locked, and the log lines say so. */
 static void enter_seat(const char *actor, int seat)
 {
     if (sync_mode == SYNC_MODE_SYNC) {
-        if (pthread_mutex_trylock(&seat_mutex[seat]) != 0) {
-            log_event(actor, "waiting for mutex of Resource %d", seat);
-            mutex_lock(&seat_mutex[seat]);
-        }
+        lock_seat(actor, seat);
         log_event(actor, "entering critical section (Resource %d)", seat);
     } else {
         log_event(actor, "entering critical section (Resource %d) (NO LOCK)", seat);
@@ -169,8 +175,11 @@ void reservation_list(int worker_id, Response *response)
     actor_name(actor, sizeof(actor), worker_id);
 
     if (sync_mode == SYNC_MODE_SYNC) {
+        /* Seats are taken one by one in ascending order (no deadlock), so
+         * while LIST waits for a busy seat it already holds the lower ones. */
+        log_event(actor, "locking all seats in order 1..%d", MAX_SEATS);
         for (seat = 1; seat <= MAX_SEATS; ++seat) {
-            mutex_lock(&seat_mutex[seat]);
+            lock_seat(actor, seat);
         }
         log_event(actor, "entering critical section (all seats)");
     } else {

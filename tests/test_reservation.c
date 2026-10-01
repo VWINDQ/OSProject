@@ -314,6 +314,70 @@ static void *reserve_cancel_loop(void *argument)
     return NULL;
 }
 
+/* 1-based number of the first log line containing `needle`, 0 if none. */
+static int line_number(FILE *log, const char *needle)
+{
+    char line[256];
+    int number = 0;
+
+    rewind(log);
+    while (fgets(line, sizeof(line), log) != NULL) {
+        ++number;
+        if (strstr(line, needle) != NULL) {
+            return number;
+        }
+    }
+    return 0;
+}
+
+static void *hold_seat_10(void *argument)
+{
+    Response r;
+
+    (void)argument;
+    reservation_reserve(1, 1, 10, &r);
+    return NULL;
+}
+
+static void *list_after_a_pause(void *argument)
+{
+    Response r;
+    struct timespec pause = {0, 100 * 1000000L};
+
+    (void)argument;
+    nanosleep(&pause, NULL);
+    reservation_list(2, &r);
+    return NULL;
+}
+
+/* LIST takes the seat mutexes one by one. When one of them is busy the log
+ * must say so, otherwise it shows other workers waiting with no visible cause. */
+static void test_list_logs_when_it_waits_for_a_seat(void)
+{
+    pthread_t holder;
+    pthread_t lister;
+    FILE *log = begin_log();
+    int waiting;
+    int released;
+
+    CHECK(reservation_init(SYNC_MODE_SYNC, 300, 300) == 0);
+    CHECK(pthread_create(&holder, NULL, hold_seat_10, NULL) == 0);
+    CHECK(pthread_create(&lister, NULL, list_after_a_pause, NULL) == 0);
+    pthread_join(holder, NULL);
+    pthread_join(lister, NULL);
+
+    waiting = line_number(log, "[Worker-2] waiting for mutex of Resource 10");
+    released = line_number(log, "[Worker-1] leaving critical section (Resource 10)");
+    CHECK(line_number(log, "[Worker-2] locking all seats in order 1..20") != 0);
+    CHECK(waiting != 0);
+    CHECK(waiting < released);
+    CHECK(count_in_log(log, "[Worker-2] waiting for mutex") == 1);
+    CHECK(count_in_log(log, "[Worker-2] entering critical section (all seats)") == 1);
+
+    reservation_destroy();
+    end_log(log);
+}
+
 static void test_list_and_writers_do_not_deadlock(void)
 {
     pthread_t threads[4];
@@ -346,6 +410,7 @@ int main(void)
     test_sync_admits_one_winner();
     test_nosync_shows_the_race();
     test_sync_locks_each_seat_separately();
+    test_list_logs_when_it_waits_for_a_seat();
     test_list_and_writers_do_not_deadlock();
 
     if (failures != 0) {

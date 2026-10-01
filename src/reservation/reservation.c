@@ -13,14 +13,8 @@
 
 #define ACTOR_SIZE 32
 
-/*
- * Shared Data of the experiment: owners[seat] is 0 when the seat is
- * available, otherwise the client id of the owner.
- *
- * `volatile` only forces every access to go to memory, so the race stays
- * observable after the random delay. It does NOT make the accesses safe;
- * that is the job of seat_mutex[] (SYNC_MODE_SYNC).
- */
+/* volatile keeps each access a real memory access so the race stays visible after the delay;
+ * it does not make access safe, seat_mutex[] does that. */
 static volatile int owners[MAX_SEATS + 1];
 static pthread_mutex_t seat_mutex[MAX_SEATS + 1];
 static SyncMode sync_mode = SYNC_MODE_SYNC;
@@ -131,7 +125,6 @@ static void sleep_ms(int milliseconds)
     }
 }
 
-/* Take one seat's mutex, logging when it is busy so a wait is never invisible. */
 static void lock_seat(const char *actor, int seat)
 {
     if (pthread_mutex_trylock(&seat_mutex[seat]) != 0) {
@@ -140,8 +133,6 @@ static void lock_seat(const char *actor, int seat)
     }
 }
 
-/* Critical-section entry/exit for one seat. In SYNC_MODE_NOSYNC nothing is
- * locked, and the log lines say so. */
 static void enter_seat(const char *actor, int seat)
 {
     if (sync_mode == SYNC_MODE_SYNC) {
@@ -152,8 +143,7 @@ static void enter_seat(const char *actor, int seat)
     }
 }
 
-/* The "leaving" line is logged before the unlock so the log order never
- * contradicts the real order of events. */
+/* Logged before the unlock so the log order matches the real order. */
 static void leave_seat(const char *actor, int seat)
 {
     if (sync_mode == SYNC_MODE_SYNC) {
@@ -175,8 +165,7 @@ void reservation_list(int worker_id, Response *response)
     actor_name(actor, sizeof(actor), worker_id);
 
     if (sync_mode == SYNC_MODE_SYNC) {
-        /* Seats are taken one by one in ascending order (no deadlock), so
-         * while LIST waits for a busy seat it already holds the lower ones. */
+        /* Ascending order avoids deadlock; LIST holds the lower seats while it waits for a busy one. */
         log_event(actor, "locking all seats in order 1..%d", MAX_SEATS);
         for (seat = 1; seat <= MAX_SEATS; ++seat) {
             lock_seat(actor, seat);
@@ -261,13 +250,11 @@ void reservation_reserve(int worker_id, int client_id, int seat,
     } else {
         log_event(actor, "check Resource %d: AVAILABLE", seat);
 
-        /* Widen the race window (assignment requirement: 50-500 ms). */
         delay = random_delay_ms(worker_id);
         log_event(actor, "random delay %d ms", delay);
         sleep_ms(delay);
 
-        /* Observation only: in NOSYNC another worker may have reserved the
-         * seat during the delay. We still overwrite it, like real buggy code. */
+        /* NOSYNC: another worker may have taken the seat during the delay; we still overwrite it. */
         current = owners[seat];
         if (current != 0) {
             log_event(actor,

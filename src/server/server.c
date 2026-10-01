@@ -33,8 +33,7 @@ typedef struct {
     int delay_max_ms;
 } ServerConfig;
 
-/* Hand-over point between the Receiver and the Workers. Its mutex protects
- * only this queue; the seat table has its own mutexes in reservation.c. */
+/* Receiver-to-Worker hand-over; its mutex guards only this queue, not the seat table. */
 typedef struct {
     Request items[WORK_QUEUE_CAPACITY];
     size_t head;
@@ -67,7 +66,7 @@ static bool install_signal_handlers(void)
     memset(&action, 0, sizeof(action));
     action.sa_handler = stop_server;
     sigemptyset(&action.sa_mask);
-    /* No SA_RESTART: a blocking call returns EINTR so the loop can stop. */
+    /* No SA_RESTART, so blocking calls return EINTR. */
     if (sigaction(SIGINT, &action, NULL) == -1 ||
         sigaction(SIGTERM, &action, NULL) == -1) {
         perror("sigaction");
@@ -164,7 +163,6 @@ static void work_queue_destroy(WorkQueue *queue)
     pthread_mutex_destroy(&queue->mutex);
 }
 
-/* Waits while the queue is full. Returns false if the queue was closed. */
 static bool work_queue_push(WorkQueue *queue, const Request *request)
 {
     bool pushed = false;
@@ -183,8 +181,7 @@ static bool work_queue_push(WorkQueue *queue, const Request *request)
     return pushed;
 }
 
-/* Waits while the queue is empty. Returns false once it is closed and drained,
- * so a shutdown still lets workers finish the requests already accepted. */
+/* Returns false only once the queue is closed and drained. */
 static bool work_queue_pop(WorkQueue *queue, Request *request)
 {
     bool popped = false;
@@ -225,9 +222,7 @@ static bool is_known_command(const char *command)
            strcmp(command, "QUIT") == 0;
 }
 
-/* A client's reply queue is /cinema_client_<digits and underscores>. Refusing
- * anything else stops a forged request from making the server write into some
- * other queue. `name` must be NUL-terminated. */
+/* Only /cinema_client_ + digits/underscores, so a forged name cannot target another queue. */
 static bool is_valid_response_queue(const char *name)
 {
     size_t prefix_length = strlen(CLIENT_QUEUE_PREFIX);
@@ -240,7 +235,7 @@ static bool is_valid_response_queue(const char *name)
     return suffix[0] != '\0' && strspn(suffix, "0123456789_") == strlen(suffix);
 }
 
-/* Returns NULL when the request is acceptable, otherwise why it is not. */
+/* NULL when the request is acceptable, otherwise the reason it is not. */
 static const char *validate_request(const Request *request)
 {
     if (!is_known_command(request->command)) {
@@ -325,8 +320,7 @@ static void *worker_main(void *argument)
     return NULL;
 }
 
-/* Workers must not receive SIGINT/SIGTERM: block them while the threads are
- * created so only the main thread runs the handler. Returns how many started. */
+/* Block SIGINT/SIGTERM while creating workers so only the main thread handles them. */
 static int start_workers(Worker workers[], int count, WorkQueue *queue)
 {
     sigset_t blocked;
@@ -375,7 +369,7 @@ static mqd_t create_request_queue(void)
     attributes.mq_maxmsg = QUEUE_MAX_MESSAGES;
     attributes.mq_msgsize = REQUEST_MESSAGE_SIZE;
 
-    /* A previous run that crashed may have left its queue behind. */
+    /* A crashed run may have left its queue behind. */
     if (mq_unlink(REQUEST_QUEUE) == -1 && errno != ENOENT) {
         fprintf(stderr, "Cannot remove stale request queue %s: %s\n",
                 REQUEST_QUEUE, strerror(errno));
@@ -390,9 +384,7 @@ static mqd_t create_request_queue(void)
     return queue;
 }
 
-/* Reads requests until a signal asks the server to stop. Returns false if
- * reading failed for another reason. The timed receive lets the loop notice
- * `running == 0` even when the signal arrives just before the call. */
+/* Timed receive, so a signal arriving just before the call is still noticed. */
 static bool receive_requests(mqd_t request_queue, WorkQueue *work_queue)
 {
     Request request;

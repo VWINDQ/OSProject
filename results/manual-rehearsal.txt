@@ -1,0 +1,100 @@
+Manual rehearsal: ./server nosync 3 + five separate docker exec clients sending RESERVE 10
+--- Client 1
+SUCCESS: Seat 10 reserved successfully.
+SUCCESS: Client session closed.
+--- Client 2
+SUCCESS: Seat 10 reserved successfully.
+SUCCESS: Client session closed.
+--- Client 3
+FAILED: Seat 10 is already reserved.
+SUCCESS: Client session closed.
+--- Client 4
+SUCCESS: Seat 10 reserved successfully.
+SUCCESS: Client session closed.
+--- Client 5
+FAILED: Seat 10 is already reserved.
+SUCCESS: Client session closed.
+--- final STATUS 10 (Client 99)
+SUCCESS: Seat 10 is reserved by Client 2.
+SUCCESS: Client session closed.
+--- server log
+[#0001 +0000ms][Server] started: mode=nosync workers=3 delay=50-500 ms queue=/cinema_request
+[#0002 +0757ms][Worker-1] received RESERVE 10 from Client-1
+[#0003 +0759ms][Worker-1] entering critical section (Resource 10) (NO LOCK)
+[#0004 +0760ms][Worker-1] check Resource 10: AVAILABLE
+[#0005 +0762ms][Worker-1] random delay 382 ms
+[#0006 +0845ms][Worker-2] received RESERVE 10 from Client-2
+[#0007 +0859ms][Worker-2] entering critical section (Resource 10) (NO LOCK)
+[#0008 +0869ms][Worker-2] check Resource 10: AVAILABLE
+[#0009 +0883ms][Worker-2] random delay 330 ms
+[#0010 +0905ms][Worker-3] received RESERVE 10 from Client-4
+[#0011 +0913ms][Worker-3] entering critical section (Resource 10) (NO LOCK)
+[#0012 +0914ms][Worker-3] check Resource 10: AVAILABLE
+[#0013 +0916ms][Worker-3] random delay 205 ms
+[#0014 +1123ms][Worker-3] Resource 10 reserved by Client-4
+[#0015 +1124ms][Worker-3] leaving critical section (Resource 10) (NO LOCK)
+[#0016 +1125ms][Worker-3] replied SUCCESS to Client-4
+[#0017 +1129ms][Worker-3] received RESERVE 10 from Client-3
+[#0018 +1130ms][Worker-3] entering critical section (Resource 10) (NO LOCK)
+[#0019 +1131ms][Worker-3] check Resource 10: RESERVED by Client-4
+[#0020 +1134ms][Worker-3] Resource 10 already reserved
+[#0021 +1135ms][Worker-3] leaving critical section (Resource 10) (NO LOCK)
+[#0022 +1137ms][Worker-3] replied FAILED to Client-3
+[#0023 +1140ms][Worker-3] received RESERVE 10 from Client-5
+[#0024 +1142ms][Worker-3] entering critical section (Resource 10) (NO LOCK)
+[#0025 +1144ms][Worker-3] check Resource 10: RESERVED by Client-4
+[#0026 +1146ms][Worker-3] Resource 10 already reserved
+[#0027 +1148ms][Worker-3] leaving critical section (Resource 10) (NO LOCK)
+[#0028 +1149ms][Worker-1] RACE DETECTED: Resource 10 is now owned by Client-4, overwriting
+[#0029 +1151ms][Worker-1] Resource 10 reserved by Client-1
+[#0030 +1152ms][Worker-1] leaving critical section (Resource 10) (NO LOCK)
+[#0031 +1153ms][Worker-3] replied FAILED to Client-5
+[#0032 +1157ms][Worker-3] received QUIT from Client-4
+[#0033 +1161ms][Worker-1] replied SUCCESS to Client-1
+[#0034 +1174ms][Worker-1] received QUIT from Client-3
+[#0035 +1187ms][Worker-3] replied SUCCESS to Client-4
+[#0036 +1199ms][Worker-3] received QUIT from Client-5
+[#0037 +1201ms][Worker-1] replied SUCCESS to Client-3
+[#0038 +1212ms][Worker-1] received QUIT from Client-1
+[#0039 +1222ms][Worker-3] replied SUCCESS to Client-5
+[#0040 +1232ms][Worker-1] replied SUCCESS to Client-1
+[#0041 +1238ms][Worker-2] RACE DETECTED: Resource 10 is now owned by Client-1, overwriting
+[#0042 +1256ms][Worker-2] Resource 10 reserved by Client-2
+[#0043 +1257ms][Worker-2] leaving critical section (Resource 10) (NO LOCK)
+[#0044 +1259ms][Worker-2] replied SUCCESS to Client-2
+[#0045 +1260ms][Worker-3] received QUIT from Client-2
+[#0046 +1261ms][Worker-3] replied SUCCESS to Client-2
+[#0047 +1817ms][Worker-1] received STATUS 10 from Client-99
+[#0048 +1819ms][Worker-1] entering critical section (Resource 10) (NO LOCK)
+[#0049 +1821ms][Worker-1] check Resource 10: RESERVED by Client-2
+[#0050 +1822ms][Worker-1] leaving critical section (Resource 10) (NO LOCK)
+[#0051 +1824ms][Worker-1] replied SUCCESS to Client-99
+[#0052 +1825ms][Worker-2] received QUIT from Client-99
+[#0053 +1826ms][Worker-2] replied SUCCESS to Client-99
+[#0054 +2513ms][Server] shutting down
+[#0055 +2516ms][Server] Worker-1 processed 4 requests
+[#0056 +2517ms][Server] Worker-2 processed 2 requests
+[#0057 +2519ms][Server] Worker-3 processed 6 requests
+Resource  Status     Owner
+--------------------------------
+1         AVAILABLE  -
+2         AVAILABLE  -
+3         AVAILABLE  -
+4         AVAILABLE  -
+5         AVAILABLE  -
+6         AVAILABLE  -
+7         AVAILABLE  -
+8         AVAILABLE  -
+9         AVAILABLE  -
+10        RESERVED   Client-2
+11        AVAILABLE  -
+12        AVAILABLE  -
+13        AVAILABLE  -
+14        AVAILABLE  -
+15        AVAILABLE  -
+16        AVAILABLE  -
+17        AVAILABLE  -
+18        AVAILABLE  -
+19        AVAILABLE  -
+20        AVAILABLE  -
+[#0058 +2522ms][Server] stopped

@@ -1,0 +1,8 @@
+date: 2026-10-05T14:30:10Z
+git commit (code under test): 59552ad8c971cf03013811e8e01c168097a659f2
+docker client/server: 29.7.2 / 29.7.2
+image: sha256:d95489a48095318aa6bb0f55f2a3b563bb0b4c9db1bebaa5117bdd62c049cf8b
+kernel: 6.18.33.2-microsoft-standard-WSL2
+cpus: 12
+compiler: gcc (GCC) 14.3.0
+mqueue limits: msg_max=10 msgsize_max=8192

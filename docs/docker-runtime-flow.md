@@ -37,7 +37,7 @@ Docker Desktop / Docker Engine
 สคริปต์ทดลองเขียนผลที่ `/app/results` ใน container มีสองวิธีเอาออกมา
 
 - `docker cp cinema:/app/results ./my-results` หลังรันเสร็จ
-- ใส่ `-v "${PWD}/results:/app/results"` ตอน `docker run` (PowerShell/bash; cmd.exe ใช้ `%cd%`, Git Bash ใช้ `$(pwd -W)`) ผลจะเขียนลงโฟลเดอร์ `results/` บนเครื่องโดยตรงและเขียนทับของเดิมทุกครั้ง
+- ใส่ `-v "${PWD}/results:/app/results"` ตอน `docker run` (PowerShell/bash; cmd.exe ใช้ `%cd%`, Git Bash ใช้ `$(pwd -W)`) ผลจะเขียนลงโฟลเดอร์ `results/` บนเครื่องโดยตรงและเขียนทับของเดิมทุกครั้ง (รวมไฟล์หลักฐานที่ commit ไว้ใน repo กู้คืนด้วย `git checkout -- results`)
 
 `make test` เขียนผลที่ `/tmp/cinema_results` ใน container จึงไม่ทับ `results/`
 

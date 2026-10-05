@@ -1,0 +1,80 @@
+[#0001 +0000ms][Server] started: mode=nosync workers=3 delay=50-500 ms queue=/cinema_request
+[#0002 +0055ms][Worker-1] received RESERVE 10 from Client-1
+[#0003 +0056ms][Worker-1] entering critical section (Resource 10) (NO LOCK)
+[#0004 +0057ms][Worker-1] check Resource 10: AVAILABLE
+[#0005 +0057ms][Worker-1] random delay 311 ms
+[#0006 +0058ms][Worker-2] received RESERVE 10 from Client-2
+[#0007 +0058ms][Worker-2] entering critical section (Resource 10) (NO LOCK)
+[#0008 +0059ms][Worker-2] check Resource 10: AVAILABLE
+[#0009 +0059ms][Worker-2] random delay 238 ms
+[#0010 +0060ms][Worker-3] received RESERVE 10 from Client-3
+[#0011 +0060ms][Worker-3] entering critical section (Resource 10) (NO LOCK)
+[#0012 +0060ms][Worker-3] check Resource 10: AVAILABLE
+[#0013 +0061ms][Worker-3] random delay 480 ms
+[#0014 +0298ms][Worker-2] Resource 10 reserved by Client-2
+[#0015 +0299ms][Worker-2] leaving critical section (Resource 10) (NO LOCK)
+[#0016 +0299ms][Worker-2] replied SUCCESS to Client-2
+[#0017 +0300ms][Worker-2] received RESERVE 10 from Client-4
+[#0018 +0300ms][Worker-2] entering critical section (Resource 10) (NO LOCK)
+[#0019 +0301ms][Worker-2] check Resource 10: RESERVED by Client-2
+[#0020 +0301ms][Worker-2] Resource 10 already reserved
+[#0021 +0302ms][Worker-2] leaving critical section (Resource 10) (NO LOCK)
+[#0022 +0302ms][Worker-2] replied FAILED to Client-4
+[#0023 +0302ms][Worker-2] received RESERVE 10 from Client-5
+[#0024 +0303ms][Worker-2] entering critical section (Resource 10) (NO LOCK)
+[#0025 +0303ms][Worker-2] check Resource 10: RESERVED by Client-2
+[#0026 +0303ms][Worker-2] Resource 10 already reserved
+[#0027 +0304ms][Worker-2] leaving critical section (Resource 10) (NO LOCK)
+[#0028 +0304ms][Worker-2] replied FAILED to Client-5
+[#0029 +0304ms][Worker-2] received QUIT from Client-2
+[#0030 +0305ms][Worker-2] replied SUCCESS to Client-2
+[#0031 +0305ms][Worker-2] received QUIT from Client-4
+[#0032 +0306ms][Worker-2] replied SUCCESS to Client-4
+[#0033 +0306ms][Worker-2] received QUIT from Client-5
+[#0034 +0306ms][Worker-2] replied SUCCESS to Client-5
+[#0035 +0369ms][Worker-1] RACE DETECTED: Resource 10 is now owned by Client-2, overwriting
+[#0036 +0370ms][Worker-1] Resource 10 reserved by Client-1
+[#0037 +0370ms][Worker-1] leaving critical section (Resource 10) (NO LOCK)
+[#0038 +0371ms][Worker-1] replied SUCCESS to Client-1
+[#0039 +0371ms][Worker-2] received QUIT from Client-1
+[#0040 +0371ms][Worker-2] replied SUCCESS to Client-1
+[#0041 +0542ms][Worker-3] RACE DETECTED: Resource 10 is now owned by Client-1, overwriting
+[#0042 +0543ms][Worker-3] Resource 10 reserved by Client-3
+[#0043 +0543ms][Worker-3] leaving critical section (Resource 10) (NO LOCK)
+[#0044 +0544ms][Worker-3] replied SUCCESS to Client-3
+[#0045 +0546ms][Worker-1] received QUIT from Client-3
+[#0046 +0547ms][Worker-1] replied SUCCESS to Client-3
+[#0047 +0549ms][Worker-2] received STATUS 10 from Client-99
+[#0048 +0550ms][Worker-2] entering critical section (Resource 10) (NO LOCK)
+[#0049 +0550ms][Worker-2] check Resource 10: RESERVED by Client-3
+[#0050 +0551ms][Worker-2] leaving critical section (Resource 10) (NO LOCK)
+[#0051 +0551ms][Worker-2] replied SUCCESS to Client-99
+[#0052 +0551ms][Worker-3] received QUIT from Client-99
+[#0053 +0552ms][Worker-3] replied SUCCESS to Client-99
+[#0054 +0552ms][Server] shutting down
+[#0055 +0553ms][Server] Worker-1 processed 2 requests
+[#0056 +0553ms][Server] Worker-2 processed 8 requests
+[#0057 +0554ms][Server] Worker-3 processed 2 requests
+Resource  Status     Owner
+--------------------------------
+1         AVAILABLE  -
+2         AVAILABLE  -
+3         AVAILABLE  -
+4         AVAILABLE  -
+5         AVAILABLE  -
+6         AVAILABLE  -
+7         AVAILABLE  -
+8         AVAILABLE  -
+9         AVAILABLE  -
+10        RESERVED   Client-3
+11        AVAILABLE  -
+12        AVAILABLE  -
+13        AVAILABLE  -
+14        AVAILABLE  -
+15        AVAILABLE  -
+16        AVAILABLE  -
+17        AVAILABLE  -
+18        AVAILABLE  -
+19        AVAILABLE  -
+20        AVAILABLE  -
+[#0058 +0554ms][Server] stopped

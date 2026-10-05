@@ -5,6 +5,9 @@
 /raw_request
 /test_logger
 /test_reservation
+/load_test
+/test_server_lock
+/test_latency_stats
 
 # macOS metadata
 .DS_Store

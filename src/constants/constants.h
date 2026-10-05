@@ -20,4 +20,10 @@
 #define RESPONSE_FAILED 0
 #define RESPONSE_SUCCESS 1
 
+#define SERVER_LOCK_FILE "/tmp/cinema_server.lock"
+
+#define DEFAULT_TIMEOUT_SECONDS 10
+#define MAX_TIMEOUT_SECONDS 3600
+#define TIMEOUT_ENV "CINEMA_TIMEOUT_SECONDS"
+
 #endif

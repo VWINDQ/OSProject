@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef struct {
@@ -274,28 +275,76 @@ static void build_request(Request *request, int client_id,
              response_queue_name);
 }
 
-static bool send_request(mqd_t request_queue, const Request *request)
+static int read_timeout_seconds(void)
 {
-    if (mq_send(request_queue, (const char *)request,
-                sizeof(*request), 0) == -1) {
-        fprintf(stderr, "Failed to send request: %s\n", strerror(errno));
+    const char *text = getenv(TIMEOUT_ENV);
+    char *end_pointer = NULL;
+    long value;
+
+    if (text == NULL || *text == '\0') {
+        return DEFAULT_TIMEOUT_SECONDS;
+    }
+
+    errno = 0;
+    value = strtol(text, &end_pointer, 10);
+    if (errno == ERANGE || *end_pointer != '\0' || value < 1 ||
+        value > MAX_TIMEOUT_SECONDS) {
+        fprintf(stderr, "Ignoring invalid %s=%s (use 1-%d); using %d s.\n",
+                TIMEOUT_ENV, text, MAX_TIMEOUT_SECONDS,
+                DEFAULT_TIMEOUT_SECONDS);
+        return DEFAULT_TIMEOUT_SECONDS;
+    }
+    return (int)value;
+}
+
+static struct timespec deadline_in(int seconds)
+{
+    struct timespec deadline;
+
+    clock_gettime(CLOCK_REALTIME, &deadline);
+    deadline.tv_sec += seconds;
+    return deadline;
+}
+
+static bool send_request(mqd_t request_queue, const Request *request,
+                         int timeout_seconds)
+{
+    struct timespec deadline = deadline_in(timeout_seconds);
+
+    if (mq_timedsend(request_queue, (const char *)request,
+                     sizeof(*request), 0, &deadline) == -1) {
+        if (errno == ETIMEDOUT) {
+            fprintf(stderr,
+                    "Request was not sent: the server did not accept it "
+                    "within %d s.\n",
+                    timeout_seconds);
+        } else {
+            fprintf(stderr, "Failed to send request: %s\n", strerror(errno));
+        }
         return false;
     }
     return true;
 }
 
-static bool receive_response(mqd_t response_queue, Response *response)
+static bool receive_response(mqd_t response_queue, Response *response,
+                             int timeout_seconds)
 {
+    struct timespec deadline = deadline_in(timeout_seconds);
     ssize_t received;
 
     do {
-        received = mq_receive(response_queue, (char *)response,
-                              sizeof(*response), NULL);
+        received = mq_timedreceive(response_queue, (char *)response,
+                                   sizeof(*response), NULL, &deadline);
     } while (received == -1 && errno == EINTR && !interrupted);
 
     if (received == -1) {
         if (errno == EINTR && interrupted) {
             fprintf(stderr, "Interrupted while waiting for server response.\n");
+        } else if (errno == ETIMEDOUT) {
+            fprintf(stderr,
+                    "No reply within %d s; the outcome is unknown, "
+                    "check STATUS before retrying.\n",
+                    timeout_seconds);
         } else {
             fprintf(stderr, "Failed to receive response: %s\n",
                     strerror(errno));
@@ -354,6 +403,7 @@ int main(int argc, char *argv[])
     Response response;
     ReadResult read_result;
     int client_id;
+    int timeout_seconds;
     int exit_status = EXIT_SUCCESS;
 
     if (argc != 2 || !parse_client_id(argv[1], &client_id)) {
@@ -366,6 +416,7 @@ int main(int argc, char *argv[])
     if (!install_signal_handlers()) {
         return EXIT_FAILURE;
     }
+    timeout_seconds = read_timeout_seconds();
 
     context.request_queue = open_request_queue();
     if (context.request_queue == (mqd_t)-1) {
@@ -408,11 +459,12 @@ int main(int argc, char *argv[])
         build_request(&request, client_id, &parsed,
                       context.response_queue_name);
         printf("Sending request...\n");
-        if (!send_request(context.request_queue, &request)) {
+        if (!send_request(context.request_queue, &request, timeout_seconds)) {
             exit_status = EXIT_FAILURE;
             break;
         }
-        if (!receive_response(context.response_queue, &response)) {
+        if (!receive_response(context.response_queue, &response,
+                              timeout_seconds)) {
             exit_status = interrupted ? EXIT_SUCCESS : EXIT_FAILURE;
             break;
         }

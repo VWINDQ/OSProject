@@ -4,6 +4,7 @@
 #include "models/message.h"
 #include "reservation/reservation.h"
 #include "utils/logger.h"
+#include "utils/server_lock.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -456,6 +457,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     if (!install_signal_handlers()) {
+        return EXIT_FAILURE;
+    }
+    if (server_lock_acquire() == -1) {
         return EXIT_FAILURE;
     }
 

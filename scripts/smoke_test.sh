@@ -181,4 +181,52 @@ for args in "nosync 0" "sync 33" "sync abc" "sync 3 500 50" "sync 3 50" "bogus" 
     echo "  ok: rejected '${args}'"
 done
 
+echo "== F. a second server is refused"
+start_server first sync 3 0 0
+second_status=0
+timeout 5 ./server sync 3 0 0 > /dev/null 2> "${work_dir}/second.err" || second_status=$?
+[[ "${second_status}" -eq 1 ]] || fail "second server exited with ${second_status}, expected 1"
+grep -Fq "already running" "${work_dir}/second.err" || fail "no 'already running' message from the second server"
+echo "  ok: second server refused with exit code 1"
+expect "$(run_client 1 'RESERVE 11')" "SUCCESS: Seat 11 reserved successfully." "first server still serves clients"
+stop_server || fail "first server did not stop cleanly"
+
+echo "== G. client gives up when the server stops answering"
+start_server frozen sync 3 0 0
+kill -STOP "${server_pid}"
+started="$(date +%s)"
+client_status=0
+output="$(printf 'RESERVE 3\nQUIT\n' | CINEMA_TIMEOUT_SECONDS=1 timeout 15 ./client 9 2>&1)" || client_status=$?
+elapsed=$(($(date +%s) - started))
+expect "${output}" "No reply within 1 s" "client reports the missing reply"
+expect "${output}" "check STATUS before retrying" "client warns that the outcome is unknown"
+[[ "${client_status}" -ne 0 ]] || fail "client exited 0 after a timeout"
+[[ "${elapsed}" -le 5 ]] || fail "client waited ${elapsed} s although the timeout was 1 s"
+echo "  ok: gave up after ${elapsed} s with a non-zero exit code"
+# One request (from client 9) is already queued; nine more fill /cinema_request.
+for n in $(seq 1 9); do
+    ./raw_request 5 STATUS 1 "/cinema_client_5_${n}" --no-reply > /dev/null
+done
+wait_for "request queue to fill up" request_queue_full
+client_status=0
+output="$(printf 'STATUS 1\n' | CINEMA_TIMEOUT_SECONDS=1 timeout 15 ./client 9 2>&1)" || client_status=$?
+expect "${output}" "Request was not sent" "client reports a request it could not send"
+[[ "${client_status}" -ne 0 ]] || fail "client exited 0 although its request was not sent"
+kill -CONT "${server_pid}"
+wait_for "server to answer the queued RESERVE" log_has "cannot reply to Client-9"
+expect "$(run_client 1 'STATUS 3')" "Seat 3 is reserved by Client 9." "the timed-out RESERVE was still carried out"
+stop_server || fail "server did not stop cleanly"
+
+echo "== H. load test tool"
+start_server load sync 3 0 0
+output="$(timeout 30 ./load_test 2 1)"
+expect "${output}" "RESULT clients=2 seconds=1" "load test prints a result line"
+grep -Eq "requests=[1-9][0-9]* errors=0 " <<<"${output}" || fail "load test saw no requests or some errors: ${output}"
+echo "  ok: requests were answered without errors"
+if ./load_test 0 1 > /dev/null 2>&1; then
+    fail "load_test accepted 0 clients"
+fi
+echo "  ok: load_test rejects 0 clients"
+stop_server || fail "server did not stop cleanly"
+
 printf '%s\n' "Smoke test passed."

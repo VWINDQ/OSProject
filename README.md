@@ -49,6 +49,7 @@ cinema-reservation/
 │   ├── check_readme.sh        # ตรวจว่า README/docs ครบตามโจทย์ข้อ 7
 │   └── dk.sh                  # รันคำสั่งใน container gcc (สำหรับ Git Bash บน Windows)
 ├── tests/                     # unit test (logger, reservation, server_lock, latency_stats) และ raw_request.c
+├── results/                   # หลักฐานการทดลองจริงจาก Docker (Experiment 1-3, Demo 1, load test)
 ├── Dockerfile
 ├── Makefile
 └── README.md

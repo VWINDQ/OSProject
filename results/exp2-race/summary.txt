@@ -1,0 +1,22 @@
+Experiment 2: Concurrent without synchronization (race condition)
+server: ./server nosync 3   clients: 5 x RESERVE 10   rounds: 10
+
+round 1: SUCCESS=3 RACE_DETECTED=2 final_owner=1 other_failures=0 mutex_waits=0
+    Client 1 : SUCCESS
+    Client 2 : SUCCESS
+    Client 3 : SUCCESS
+    Client 4 : FAILED
+    Client 5 : FAILED
+round 2: SUCCESS=3 RACE_DETECTED=2 final_owner=3 other_failures=0 mutex_waits=0
+round 3: SUCCESS=3 RACE_DETECTED=2 final_owner=3 other_failures=0 mutex_waits=0
+round 4: SUCCESS=3 RACE_DETECTED=2 final_owner=1 other_failures=0 mutex_waits=0
+round 5: SUCCESS=3 RACE_DETECTED=2 final_owner=1 other_failures=0 mutex_waits=0
+round 6: SUCCESS=3 RACE_DETECTED=2 final_owner=3 other_failures=0 mutex_waits=0
+round 7: SUCCESS=3 RACE_DETECTED=2 final_owner=2 other_failures=0 mutex_waits=0
+round 8: SUCCESS=3 RACE_DETECTED=2 final_owner=1 other_failures=0 mutex_waits=0
+round 9: SUCCESS=3 RACE_DETECTED=2 final_owner=3 other_failures=0 mutex_waits=0
+round 10: SUCCESS=3 RACE_DETECTED=2 final_owner=2 other_failures=0 mutex_waits=0
+
+rounds with more than one SUCCESS and a RACE DETECTED line: 10 of 10
+rounds that were sound (every client answered, owner matches a SUCCESS) with exactly one SUCCESS, no race and the required mutex waits: 0 of 10
+RESULT: PASS (race condition observed in 10 of 10 rounds)

@@ -2,8 +2,9 @@ FROM gcc:14-bookworm
 
 WORKDIR /app
 
-COPY Makefile ./
+COPY Makefile README.md ./
 COPY src ./src
+COPY docs ./docs
 COPY scripts ./scripts
 COPY tests ./tests
 

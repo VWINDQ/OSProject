@@ -1,0 +1,24 @@
+### run 1
+clients=16  seconds per run=5  command=STATUS  server log discarded
+
+workers       req/s   mean_ms    p50_ms    p95_ms    p99_ms    max_ms  errors
+1           59548.9     0.268     0.220     0.506     0.850     4.063       0
+3           67800.1     0.236     0.209     0.430     0.628     3.586       0
+8           48658.2     0.328     0.287     0.659     1.072     5.018       0
+
+### run 2
+clients=16  seconds per run=5  command=STATUS  server log discarded
+
+workers       req/s   mean_ms    p50_ms    p95_ms    p99_ms    max_ms  errors
+1           64578.5     0.248     0.209     0.420     0.727     3.395       0
+3           65996.5     0.242     0.210     0.444     0.710    11.504       0
+8           49330.2     0.324     0.276     0.648     1.101    10.667       0
+
+### run 3
+clients=16  seconds per run=5  command=STATUS  server log discarded
+
+workers       req/s   mean_ms    p50_ms    p95_ms    p99_ms    max_ms  errors
+1           48846.5     0.327     0.287     0.514     0.839     7.683       0
+3           45679.0     0.350     0.301     0.656     1.049     9.287       0
+8           27877.4     0.573     0.501     1.197     1.936    10.455       0
+

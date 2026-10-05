@@ -15,6 +15,5 @@
 # Python caches from report tooling
 __pycache__/
 
-# Local deliverables and generated experiment output (not part of the repo)
+# The Word report is a local deliverable, not part of the repo
 /report/
-/results/

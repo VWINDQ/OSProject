@@ -75,10 +75,12 @@ Read -> Parse -> Validate input
 Build Request                                      |
   |                                                |
   v                                                |
-mq_send(request queue)                             |
-  |                                                |
+mq_timedsend(request queue)                        |
+  | timeout -> "Request was not sent" -> Exit      |
   v                                                |
-mq_receive(own response queue)                     |
+mq_timedreceive(own response queue)                |
+  | timeout -> "No reply within N s" -> Exit       |
+  v                                                |
   |                                                |
   v                                                |
 Display SUCCESS/FAILED                             |
@@ -104,7 +106,9 @@ Response Queue สร้างด้วย `O_RDONLY | O_CREAT | O_EXCL` permiss
 | `open_request_queue` | ไม่มี | เปิด `/cinema_request`; คืน queue descriptor หรือ error | ก่อนเข้า menu |
 | `create_response_queue` | Client ID และ buffer ชื่อ | สร้างคิวเฉพาะ Client; คืน descriptor หรือ error | ก่อนเข้า menu |
 | `build_request` | Client ID, command, queue name | ล้าง struct แล้วใส่ทุก field | ก่อนส่งแต่ละคำขอ |
-| `send_request` | request queue และ `Request` | เรียก `mq_send`; คืน true/false | หลัง input ผ่าน validation |
-| `receive_response` | response queue และ `Response` | เรียก `mq_receive`, ตรวจขนาดข้อความ; คืน true/false | หลังส่งสำเร็จ |
+| `read_timeout_seconds` | ไม่มี | อ่าน `CINEMA_TIMEOUT_SECONDS` (1-3600) ถ้าไม่ตั้งหรือผิดใช้ 10 วินาที | ตอนเริ่มโปรแกรม |
+| `deadline_in` | จำนวนวินาที | คืนเวลาสิ้นสุดแบบ absolute สำหรับ `mq_timed*` | ก่อนส่งและก่อนรับ |
+| `send_request` | request queue, `Request`, timeout | เรียก `mq_timedsend`; หมดเวลาแล้วแจ้ง `Request was not sent`; คืน true/false | หลัง input ผ่าน validation |
+| `receive_response` | response queue, `Response`, timeout | เรียก `mq_timedreceive`, ตรวจขนาดข้อความ; หมดเวลาแล้วแจ้งว่าไม่ทราบผล; คืน true/false | หลังส่งสำเร็จ |
 | `cleanup` | `ClientContext` | ปิด descriptor ทั้งสองและ unlink คิวตอบกลับ | ทุกทางออกหลังเปิดคิว |
 | `main` | `argc/argv` | ควบคุม workflow โดยไม่ทำรายละเอียดเอง | จุดเริ่มโปรแกรม |

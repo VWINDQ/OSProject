@@ -27,15 +27,16 @@ Server เป็น process เดียวที่มี **Worker หลาย
 cinema-reservation/
 ├── .github/workflows/ci.yml   # CI (รันด้วยมือจากแท็บ Actions)
 ├── src/
-│   ├── client/client.c        # Client (ส่งคำสั่ง รับผลจาก Server)
+│   ├── client/client.c        # Client (ส่งคำสั่ง รับผลจาก Server, มี timeout)
 │   ├── server/server.c        # main, Receiver, Work Queue, Worker, shutdown
 │   ├── reservation/           # ตารางที่นั่ง, seat_mutex, check/delay/update, โหมด sync/nosync
 │   │   ├── reservation.c
 │   │   └── reservation.h
-│   ├── utils/                 # log ที่มี sequence number และเวลา (thread-safe)
-│   │   ├── logger.c
-│   │   └── logger.h
-│   ├── constants/constants.h  # ชื่อคิว, ขนาด, permission (ใช้ร่วม Client/Server)
+│   ├── utils/
+│   │   ├── logger.c/.h        # log ที่มี sequence number และเวลา (thread-safe)
+│   │   └── server_lock.c/.h   # กันเปิด Server ซ้ำ (ล็อกไฟล์)
+│   ├── benchmark/             # load test: load_test.c และสถิติ latency_stats.c/.h
+│   ├── constants/constants.h  # ชื่อคิว, ขนาด, permission, timeout (ใช้ร่วม Client/Server)
 │   └── models/message.h       # struct Request / Response
 ├── docs/
 │   ├── architecture.md        # สถาปัตยกรรม Server, Critical Section, Mutex, ส่วน Client
@@ -43,10 +44,11 @@ cinema-reservation/
 │   └── experiment-report.md   # ผลการทดลอง 3 กรณี และวิธีอ่าน Server log
 ├── scripts/
 │   ├── experiments.sh         # Demo 1 และ Experiment 1-3
+│   ├── load_test.sh           # load test: req/s และ latency ที่ Worker 1, 3, 8
 │   ├── smoke_test.sh          # ทดสอบ Server กับ Client แบบ end-to-end
 │   ├── check_readme.sh        # ตรวจว่า README/docs ครบตามโจทย์ข้อ 7
 │   └── dk.sh                  # รันคำสั่งใน container gcc (สำหรับ Git Bash บน Windows)
-├── tests/                     # unit test (logger, reservation) และ raw_request.c
+├── tests/                     # unit test (logger, reservation, server_lock, latency_stats) และ raw_request.c
 ├── Dockerfile
 ├── Makefile
 └── README.md
@@ -126,7 +128,7 @@ Client ID ต้องเป็นจำนวนเต็ม 1-999999 ถ้า
 
 ## รูปแบบ Message Queue
 
-ใช้ **POSIX Message Queue** (`mq_open`, `mq_send`, `mq_timedreceive`, `mq_receive`) สองชนิด:
+ใช้ **POSIX Message Queue** (`mq_open`, `mq_timedsend`, `mq_timedreceive`) สองชนิด:
 
 | Queue | ชื่อ | ใครสร้าง/ใครเขียน/ใครอ่าน |
 |---|---|---|
@@ -213,9 +215,26 @@ docker exec cinema make test                 # ใน container
 bash scripts/dk.sh make test                 # จาก Git Bash บน Windows (ใช้ container ชั่วคราว)
 ```
 
-`make test` รัน unit test (logger, reservation: `sync` ได้ผู้ชนะเดียว, `nosync` เกิด race, mutex ต่อที่นั่งทำงานขนาน, `LIST` ไม่ deadlock),
-smoke test แบบ end-to-end (รวม request ที่ผิดรูปแบบ, Client ที่หายไป, SIGTERM ระหว่างประมวลผล, คิวค้างหลัง `kill -9`, Client 30 ตัวขณะที่ Server ถูกหยุดจนคิวคำขอเต็มจริง, อาร์กิวเมนต์ผิด)
-และ Experiment ทั้งหมด (3 รอบ เขียนผลที่ `/tmp/cinema_results` ไม่ทับ `results/`)
+`make test` รัน unit test (logger, reservation: `sync` ได้ผู้ชนะเดียว, `nosync` เกิด race, mutex ต่อที่นั่งทำงานขนาน, `LIST` ไม่ deadlock; server_lock; latency_stats),
+smoke test แบบ end-to-end (รวม request ที่ผิดรูปแบบ, Client ที่หายไป, SIGTERM ระหว่างประมวลผล, คิวค้างหลัง `kill -9`, Client 30 ตัวขณะที่ Server ถูกหยุดจนคิวคำขอเต็มจริง, อาร์กิวเมนต์ผิด,
+Server ตัวที่สองถูกปฏิเสธ, Client หมดเวลารอ), Experiment ทั้งหมด (3 รอบ เขียนผลที่ `/tmp/cinema_results` ไม่ทับ `results/`) และ load test แบบสั้น
+
+## Load test
+
+วัดความเร็วของ Server ด้วยคำสั่ง `STATUS` จาก Client จำลองหลายตัวพร้อมกัน (ใช้ `STATUS` เพราะ `RESERVE` มี random delay 50-500 ms ที่จะบดบังตัวเลข) ที่ Worker 1, 3 และ 8:
+
+```bash
+docker exec cinema bash scripts/load_test.sh 16 5   # Client 16 ตัว วัดรอบละ 5 วินาที
+```
+
+พิมพ์ req/s, เวลาตอบเฉลี่ย, p50/p95/p99/max และจำนวนที่ผิดพลาดของแต่ละจำนวน Worker ตัวเลขที่วัดได้และวิธีอ่านอยู่ที่ [docs/experiment-report.md](docs/experiment-report.md)
+
+## Timeout และการกันเปิด Server ซ้ำ
+
+- **Client หมดเวลารอ:** Client รอส่งและรอคำตอบได้ไม่เกิน 10 วินาที (ตั้งใหม่ด้วย `CINEMA_TIMEOUT_SECONDS=1-3600`) ถ้าส่งไม่ได้จะขึ้น `Request was not sent` ถ้าส่งแล้วไม่มีคำตอบจะขึ้น
+  `No reply within N s; the outcome is unknown, check STATUS before retrying.` แล้ว Client จบการทำงาน (คำขอที่ส่งไปแล้วอาจถูกประมวลผลภายหลัง จึงให้ตรวจ `STATUS` ก่อนสั่งซ้ำ)
+- **Server ตัวเดียว:** Server ล็อกไฟล์ `/tmp/cinema_server.lock` ตอนเริ่ม ตัวที่สองจะขึ้น `Another server is already running` แล้วออกด้วย code 1 โดยไม่แตะคิวของตัวแรก
+  ล็อกหายเองเมื่อ Server ตาย (รวม `kill -9`)
 
 ## ส่วน Client
 
@@ -223,8 +242,8 @@ Client (`src/client/client.c`) อ่านคำสั่งจากผู้�
 
 ## ข้อจำกัด
 
-- **Server ตัวเดียว (single point of failure):** ถ้า Server ล่ม คำขอที่ค้างหาย และไม่รองรับการเปิด Server สองตัวพร้อมกัน (ตัวหลังจะลบคิวของตัวแรก)
-- **Client ไม่มี timeout:** `mq_receive` รอแบบ blocking ถ้า Server หยุดหลังรับคำขอ Client จะค้างจนกด `Ctrl+C`
+- **Server ตัวเดียว (single point of failure):** ถ้า Server ล่ม คำขอที่ค้างหาย (เปิดซ้ำไม่ได้ตั้งใจจะถูกกันด้วยล็อกไฟล์ แต่ไม่มี Server สำรอง)
+- **Client หมดเวลาแล้วจบการทำงาน:** ไม่ลองส่งซ้ำอัตโนมัติ เพราะคำขอเดิมอาจถูกประมวลผลไปแล้ว ผู้ใช้ต้องตรวจ `STATUS` เอง
 - **คิวของ Client ค้างเมื่อถูก kill:** Client ที่ถูก `kill -9` ไม่ได้ `mq_unlink` คิวของตนเอง คิวนั้นค้างจน container หยุด
 - **Worker เป็น thread ใน process เดียว:** ถ้า Worker ตัวใดทำให้ process ล้ม ทุก Worker ล้มตามกัน
 - **Experiment 2 เป็นเชิงความน่าจะเป็น:** เกิด race เกือบทุกรอบ (delay ≥ 50 ms และ Worker 3 ตัวหยิบคำขอแรกพร้อมกัน) แต่ไม่ได้รับประกัน 100%

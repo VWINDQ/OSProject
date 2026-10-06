@@ -62,7 +62,7 @@ static bool install_signal_handlers(void)
 static void show_menu(int client_id)
 {
     printf("================================\n");
-    printf("     CINEMA RESERVATION SYSTEM\n");
+    printf("   RACHA's MOVIE TICKET SYSTEM\n");
     printf("================================\n");
     printf("Client ID: %d\n\n", client_id);
     printf("Commands:\n");
